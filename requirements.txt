@@ -1,0 +1,7 @@
+pandas
+geopandas
+xlrd
+xlsxwriter
+flask
+python-dotenv
+googlemaps
