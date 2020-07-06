@@ -7,10 +7,23 @@ A live demo of this code is running within a Flask app here: [http://192.241.138
 
 ## Development environment setup:
 
+Create and activate a virtual environment:
+
 ```bash
 (base) $ conda create --name tmc_summarizer python=3.8
 (base) $ conda activate tmc_summarizer
+```
+
+Install the third-party requirements:
+
+```bash
 (tmc_summarizer) $ pip install -r requirements.txt
+```
+
+Install this package in 'edit' mode
+
+```bash
+(tmc_summarizer) $ pip install -e .
 ```
 
 ## Execute via Python, CLI, or GUI:
