@@ -198,7 +198,7 @@ def write_summary_file(input_folder: Union[Path, str],
     writer.save()
     print(f"\n-> Wrote TMC summary to {output_xlsx_filepath}")
 
-    files_to_zip = [output_xlsx_filepath]
+    # files_to_zip = [output_xlsx_filepath]
 
     # Geocode the data and save a shapefile if the helper is provided
     # ---------------------------------------------------------------
@@ -218,17 +218,17 @@ def write_summary_file(input_folder: Union[Path, str],
         gdf.to_file(output_geojson_filepath, driver='GeoJSON')
         print(f"-> Wrote point geojson to {output_geojson_filepath}")
 
-        files_to_zip.append(output_geojson_filepath)
+        # files_to_zip.append(output_geojson_filepath)
 
-    print(f"-> Zipping output files up...")
-    zip_files(output_zip_file, files_to_zip)
+    # print(f"-> Zipping output files up...")
+    # zip_files(output_zip_file, files_to_zip)
 
     end_time = datetime.now()
 
     runtime = end_time - start_time
     print(f"-> Runtime: {runtime}")
 
-    return output_zip_file
+    return output_xlsx_filepath, output_geojson_filepath
 
 
 if __name__ == "__main__":
