@@ -7,9 +7,7 @@ Here: [http://167.172.146.34](http://167.172.146.34)
 
 The codebase for the demo can be found at [``dvrpc\tmc-app``](https://github.com/dvrpc/tmc-app)
 
-A live demo of this code is running within a Flask app here: [http://192.241.138.142](http://192.241.138.142)
-
-![image info](./app/static/assets/images/app_screenshot.png)
+![image info](https://github.com/dvrpc/tmc-app/blob/master/static/assets/images/app_screenshot.png)
 
 ## Development environment setup:
 
