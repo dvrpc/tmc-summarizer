@@ -409,6 +409,84 @@ class TMC_File:
 
         return (1 - peak_light / peak_total) * 100
 
+    def all_raw_data(self) -> pd.DataFrame:
+        """ Combine the light and heavy tables together
+        into one table with LOTS of columns.
+        """
+
+        # Add Light or Heavy as a prefix to the column names
+        df_light = self.df_light.rename(
+            columns={old: "Light " + old for old in self.df_light.columns}
+        )
+        df_heavy = self.df_heavy.rename(
+            columns={old: "Heavy " + old for old in self.df_heavy.columns}
+        )
+        
+        # Concatenate the two dataframes together. They share the same index.
+        df = pd.concat([df_light, df_heavy], axis=1, sort=False)
+        
+        # Remove the 'total_' columns
+        for col in ["total_15_min", "total_hourly"]:
+            for wt in ["Light", "Heavy"]:
+                df.drop(f"{wt} {col}", axis=1, inplace=True)
+
+        return df
+
+    def treemap_df(self,
+                   start_time: str = "7:00",
+                   end_time: str = "12:00") -> pd.DataFrame:
+        """
+        Create a dataframe that can be dropped into a plotly treemap figure.
+
+        Using a start and end time filter, provide a single number for
+        movements, broken out by weight, leg, and movement.
+
+        """
+
+        # Get the full raw dataset
+        df = self.all_raw_data()
+
+        # Parse the text input into usable values
+        # i.e. '5:15' -> 5, 15
+        a_hr, a_min = start_time.split(":")
+        b_hr, b_min = end_time.split(":")
+
+        # Build a datetime for the start and end windows
+        a_time = time(hour=int(a_hr), minute=int(a_min))
+        a = datetime.combine(self.date, a_time)
+
+        b_time = time(hour=int(b_hr), minute=int(b_min))
+        b = datetime.combine(self.date, b_time)
+
+        # Filter the raw data by start and end windows
+        dff = df[(df.index >= a) & (df.index < b)]
+
+        # Sum all values so there's one row instead of one for every 15 minutes
+        treemap_df = pd.DataFrame(dff.sum())
+
+        # Add labeling columns
+        treemap_df["full_movement"] = treemap_df.index
+        treemap_df["wt"] = ""
+        treemap_df["leg"] = ""
+        treemap_df["movement"] = ""
+
+        # Parse out the values for each row
+        for idx, row in treemap_df.iterrows():
+            split_value = idx.split(" ")
+
+            wt = split_value[0]
+            leg = split_value[1]
+            movement = " ".join(split_value[2:])
+
+            if 'Peds' in movement or 'Bikes' in movement:
+                wt = movement.split(' ')[0]
+                movement = 'Xwalk'
+            
+            treemap_df.at[idx, "wt"] = wt
+            treemap_df.at[idx, "leg"] = leg
+            treemap_df.at[idx, "movement"] = movement
+
+        return treemap_df
 
 def geocode_tmc(tmc: TMC_File, geocode_helper: str):
     """
