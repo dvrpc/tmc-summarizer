@@ -441,6 +441,12 @@ class TMC_File:
         Using a start and end time filter, provide a single number for
         movements, broken out by weight, leg, and movement.
 
+        Usage
+        -----
+            >>> tmc = TMC_File('my/path.xls')
+            >>> df = tmc.treemap_df('3:00', '15:15')
+            >>> fig = px.treemap(df, path=['wt', 'leg', 'movement'], values=0)
+
         """
 
         # Get the full raw dataset
