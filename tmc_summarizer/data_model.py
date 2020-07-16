@@ -432,6 +432,27 @@ class TMC_File:
 
         return df
 
+    def filter_df_by_start_end_time(self,
+                                    df,
+                                    start_time: str = "7:00",
+                                    end_time: str = "12:00"):
+        # Parse the text input into usable values
+        # i.e. '5:15' -> 5, 15
+        a_hr, a_min = start_time.split(":")
+        b_hr, b_min = end_time.split(":")
+
+        # Build a datetime for the start and end windows
+        a_time = time(hour=int(a_hr), minute=int(a_min))
+        a = datetime.combine(self.date, a_time)
+
+        b_time = time(hour=int(b_hr), minute=int(b_min))
+        b = datetime.combine(self.date, b_time)
+
+        # Filter the raw data by start and end windows
+        dff = df[(df.index >= a) & (df.index < b)]
+
+        return dff
+
     def treemap_df(self,
                    start_time: str = "7:00",
                    end_time: str = "12:00") -> pd.DataFrame:
@@ -452,23 +473,12 @@ class TMC_File:
         # Get the full raw dataset
         df = self.all_raw_data()
 
-        # Parse the text input into usable values
-        # i.e. '5:15' -> 5, 15
-        a_hr, a_min = start_time.split(":")
-        b_hr, b_min = end_time.split(":")
-
-        # Build a datetime for the start and end windows
-        a_time = time(hour=int(a_hr), minute=int(a_min))
-        a = datetime.combine(self.date, a_time)
-
-        b_time = time(hour=int(b_hr), minute=int(b_min))
-        b = datetime.combine(self.date, b_time)
-
-        # Filter the raw data by start and end windows
-        dff = df[(df.index >= a) & (df.index < b)]
+        dff = self.filter_df_by_start_end_time(df, start_time=start_time, end_time=end_time)
 
         # Sum all values so there's one row instead of one for every 15 minutes
         treemap_df = pd.DataFrame(dff.sum())
+
+        treemap_df.rename(columns={0: "total"}, inplace=True)
 
         # Add labeling columns
         treemap_df["full_movement"] = treemap_df.index
