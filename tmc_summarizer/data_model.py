@@ -409,7 +409,7 @@ class TMC_File:
 
         return (1 - peak_light / peak_total) * 100
 
-    def all_raw_data(self) -> pd.DataFrame:
+    def all_raw_data(self, summary_col: bool = False) -> pd.DataFrame:
         """ Combine the light and heavy tables together
         into one table with LOTS of columns.
         """
@@ -425,10 +425,17 @@ class TMC_File:
         # Concatenate the two dataframes together. They share the same index.
         df = pd.concat([df_light, df_heavy], axis=1, sort=False)
         
-        # Remove the 'total_' columns
-        for col in ["total_15_min", "total_hourly"]:
-            for wt in ["Light", "Heavy"]:
-                df.drop(f"{wt} {col}", axis=1, inplace=True)
+        if summary_col:
+            # Remove all columns except the 'total_15_min' columns
+            for col in df.columns:
+                if col not in  ["Heavy total_15_min", "Light total_15_min"]:
+                    df.drop(col, axis=1, inplace=True)
+
+        else:
+            # Remove the 'total_' columns
+            for col in ["total_15_min", "total_hourly"]:
+                for wt in ["Light", "Heavy"]:
+                    df.drop(f"{wt} {col}", axis=1, inplace=True)
 
         return df
 
