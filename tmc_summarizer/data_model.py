@@ -442,7 +442,8 @@ class TMC_File:
     def filter_df_by_start_end_time(self,
                                     df,
                                     start_time: str = "7:00",
-                                    end_time: str = "12:00"):
+                                    end_time: str = "12:00",
+                                    as_type: str = "datetime"):
         # Parse the text input into usable values
         # i.e. '5:15' -> 5, 15
         a_hr, a_min = start_time.split(":")
@@ -450,10 +451,15 @@ class TMC_File:
 
         # Build a datetime for the start and end windows
         a_time = time(hour=int(a_hr), minute=int(a_min))
-        a = datetime.combine(self.date, a_time)
-
         b_time = time(hour=int(b_hr), minute=int(b_min))
-        b = datetime.combine(self.date, b_time)
+
+        if as_type == "datetime":
+            a = datetime.combine(self.date, a_time)
+            b = datetime.combine(self.date, b_time)
+
+        else:
+            a = a_time
+            b = b_time
 
         # Filter the raw data by start and end windows
         dff = df[(df.index >= a) & (df.index < b)]
