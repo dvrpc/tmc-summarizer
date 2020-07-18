@@ -4,3 +4,5 @@ xlrd
 xlsxwriter
 python-dotenv
 googlemaps
+sqlalchemy
+psycopg2-binary
