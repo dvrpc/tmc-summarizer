@@ -61,7 +61,7 @@ def generate_timeseries_data(table_name: str,
     return df
 
 
-def generate_treemap_data(df_timeseries):
+def generate_treemap_data(df_timeseries, id_col: str = "fid"):
     """
     This function consumes the dataframe from df_timeseries()
     and transforms it to fit the plotly.express.treemap()
@@ -70,8 +70,8 @@ def generate_treemap_data(df_timeseries):
     df_timeseries = df_timeseries.copy()
 
     # Update with a multi-index to include the file id, then remove the fid column
-    df_timeseries.set_index([df_timeseries.fid, df_timeseries.index], inplace=True)
-    del df_timeseries["fid"]
+    df_timeseries.set_index([df_timeseries[id_col], df_timeseries.index], inplace=True)
+    del df_timeseries[id_col]
 
     # Stack the dataframe, then reset_index() to explode the multi-index into cols
     df_stacked = pd.DataFrame(
