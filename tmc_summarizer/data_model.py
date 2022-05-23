@@ -111,28 +111,36 @@ class TMC_File:
         location_kwargs["names"] = ["count_no", "co_no_2", "date", "time"]
 
         self.df_info_time = pd.read_excel(self.filepath, **location_kwargs)
-        self.df_info_time = self.df_info_time[self.df_info_time['count_no'].notna()]
-        self.df_info_time.drop(self.df_info_time.tail(2).index,inplace=True) # drop last n rows
-        self.df_info_time.drop(columns=['co_no_2'], inplace=True) #deals with exttra column due to merged cells
+        self.df_info_time = self.df_info_time[self.df_info_time["count_no"].notna()]
+        self.df_info_time.drop(
+            self.df_info_time.tail(2).index, inplace=True
+        )  # drop last n rows
+        self.df_info_time.drop(
+            columns=["co_no_2"], inplace=True
+        )  # deals with exttra column due to merged cells
         self.df_info_time = self.df_info_time.reset_index(inplace=False)
-        self.df_info_time.drop(columns=['index'], inplace=True)
+        self.df_info_time.drop(columns=["index"], inplace=True)
 
         # Parse data from the INFO tab
         # ----------------------------
 
-        # self.date = None
-        # self.start_time = ""
-        # self.end_time = ""
-        # self.location_name = ""
-        # self.legs = {}
+        self.date = None
+        self.start_time = ""
+        self.end_time = ""
+        self.location_name = ""
+        self.legs = {}
 
-        # # Get the location_name and leg names
-        # for _, row in self.df_info_location.iterrows():
+        # Get the location_name and leg names
+        for _, row in self.df_info_location.iterrows():
 
-        #     if row.place_type == "Intersection Name":
-        #         self.location_name = row.place_name
-        #     else:
-        #         self.legs[row.place_type.upper()] = row.place_name
+            if row.place_type == "Intersection Name":
+                self.location_name = row.place_name
+            elif row.place_type == "City":
+                self.city_name = row.place_name
+            elif row.place_type == "State":
+                self.state_name = row.place_name
+            else:
+                self.legs[row.place_type.upper()] = row.place_name
 
         # # Get the date and start/end times
         # for _, row in self.df_info_time.iterrows():
