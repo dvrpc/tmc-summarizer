@@ -142,21 +142,22 @@ class TMC_File:
             else:
                 self.legs[row.place_type.upper()] = row.place_name
 
-        # # Get the date and start/end times
-        # for _, row in self.df_info_time.iterrows():
+        # Get the date and start/end times
+        for _, row in self.df_info_time.iterrows():
 
-        #     if row.time_type == "Date and Time of Start of Count 1":
-        #         self.date = row.time_value
-        #     elif row.time_type == "Start Time":
-        #         self.start_time = row.time_value
-        #     elif row.time_type == "End Time":
-        #         self.end_time = row.time_value
+            if row.count_no == "Date and Time of Start of Count 1":
+                self.date = row.date
+                self.start_time = row.time
+            elif row.count_no == "Date and Time of End of Count 1":
+                self.end_date = row.date
+                self.end_time = row.time
 
-        # # Read the DATA tabs into dataframes
-        # # ----------------------------------
+        # Read the DATA tabs into dataframes
+        # ----------------------------------
 
-        # self.df_cars = self.read_data_tab("Cars")
+        self.df_cars = self.read_data_tab("Cars")
         # self.df_heavy = self.read_data_tab("Heavy Vehicles")
+        # self.bikes = self.read_data_tab("Bicycles")
         # self.df_total = self.read_data_tab("Total Vehicles")
 
         # # Calculate the percent heavy dataframe
@@ -211,12 +212,13 @@ class TMC_File:
         # Check all time values and ensure that each one
         # is formatted as a datetime.time. Some aren't by default!
         for idx, row in df.iterrows():
-
-            if type(row.time) != time:
-
-                hour, minute = row.time.split(":")
-
-                df.at[idx, "time"] = time(hour=int(hour), minute=int(minute))
+            if type(row.time) == datetime:
+                row.time
+            elif type(row.time) != time:
+                print(row.time)
+                print(type(row.time))
+            # hour, minute = row.time.split(":")
+            # df.at[idx, "time"] = time(hour=int(hour), minute=int(minute))
 
         # Now force all times into datetime
         df["datetime"] = None
@@ -257,14 +259,15 @@ class TMC_File:
             "right turns": "Right",
             "ped crossings": "Peds Xwalk",
             "bikes in crosswalk": "Bikes Xwalk",
+            "bicycles in crosswalk": "Bikes Xwalk",
             "time": "time",
+            "date": "date",
             # handle the expected typos!
             "bikes in croswalk": "Bikes Xwalk",
             "peds in croswalk": "Peds Xwalk",
         }
 
         df = pd.read_excel(self.filepath, nrows=3, header=None, sheet_name=tabname)
-
         headers = []
 
         # Start off with a blank l1
@@ -273,7 +276,6 @@ class TMC_File:
         for col in df.columns:
             level_1 = df.at[1, col]
             level_2 = df.at[2, col]
-
             # Update the l1 anytime a value is found
             if not pd.isna(level_1):
                 l1 = replacements_level_1[level_1]
@@ -291,175 +293,174 @@ class TMC_File:
 
         return headers
 
-    def add_15_min_totals(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Add a column named 'total_15_min' that sums volumes
-        from each of the other columns, for each row.
+    # def add_15_min_totals(self, df: pd.DataFrame) -> pd.DataFrame:
+    #     """
+    #     Add a column named 'total_15_min' that sums volumes
+    #     from each of the other columns, for each row.
 
-        :param df: input dataframe
-        :type df: pd.DataFrame
-        :return: modified dataframe with new column
-        :rtype: pd.DataFrame
-        """
-        # TODO: qa that this is right from Excel
+    #     :param df: input dataframe
+    #     :type df: pd.DataFrame
+    #     :return: modified dataframe with new column
+    #     :rtype: pd.DataFrame
+    #     """
+    #     # TODO: qa that this is right from Excel
 
-        # For each row, sum all columns and put the result into "total_15_min"
-        df["total_15_min"] = df.iloc[:, :].sum(axis=1)
+    #     # For each row, sum all columns and put the result into "total_15_min"
+    #     df["total_15_min"] = df.iloc[:, :].sum(axis=1)
 
-        return df
+    #     return df
 
-    def add_hourly_totals(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Add a column named 'total_hourly' that sums 15-minute
-        volumes for a 1-hour period. It works backwards, so the
-        value on any row represents that 15-minute timeperiod plus
-        the three other 15-minute blocks prior.
+    # def add_hourly_totals(self, df: pd.DataFrame) -> pd.DataFrame:
+    #     """
+    #     Add a column named 'total_hourly' that sums 15-minute
+    #     volumes for a 1-hour period. It works backwards, so the
+    #     value on any row represents that 15-minute timeperiod plus
+    #     the three other 15-minute blocks prior.
 
+    #     :param df: input dataframe
+    #     :type df: pd.DataFrame
+    #     :return: modified dataframe with new column
+    #     :rtype: pd.DataFrame
+    #     """
 
-        :param df: input dataframe
-        :type df: pd.DataFrame
-        :return: modified dataframe with new column
-        :rtype: pd.DataFrame
-        """
+    #     # Get the column index for the 15 minute totals
+    #     col_idx_15_min = df.columns.get_loc("total_15_min")
 
-        # Get the column index for the 15 minute totals
-        col_idx_15_min = df.columns.get_loc("total_15_min")
+    #     df["total_hourly"] = 0
 
-        df["total_hourly"] = 0
+    #     for idx, row in df.iterrows():
+    #         end = idx + timedelta(minutes=15)
+    #         start = end - timedelta(hours=1)
 
-        for idx, row in df.iterrows():
-            end = idx + timedelta(minutes=15)
-            start = end - timedelta(hours=1)
+    #         hourly_total = df.iloc[
+    #             (df.index >= start) & (df.index < end), col_idx_15_min
+    #         ].sum()
 
-            hourly_total = df.iloc[
-                (df.index >= start) & (df.index < end), col_idx_15_min
-            ].sum()
+    #         df.at[idx, "total_hourly"] = hourly_total
 
-            df.at[idx, "total_hourly"] = hourly_total
+    #     return df
 
-        return df
+    # def get_peak_hour(self, period: str) -> (datetime, datetime):
+    #     """
+    #     Identify start / end times of the AM or PM peak hour.
+    #     Return this information as a tuple with each value as a datetime.
 
-    def get_peak_hour(self, period: str) -> (datetime, datetime):
-        """
-        Identify start / end times of the AM or PM peak hour.
-        Return this information as a tuple with each value as a datetime.
+    #     :param period: time of day, either 'AM' or 'PM'
+    #     :type period: str
+    #     :return: tuple with (start_time, end_time)
+    #     :rtype: tuple with datetime
+    #     """
 
-        :param period: time of day, either 'AM' or 'PM'
-        :type period: str
-        :return: tuple with (start_time, end_time)
-        :rtype: tuple with datetime
-        """
+    #     period = period.upper()
 
-        period = period.upper()
+    #     noon = datetime.combine(self.date, time(hour=12))
 
-        noon = datetime.combine(self.date, time(hour=12))
+    #     if period == "AM":
+    #         df = self.df_total[(self.df_total.index < noon)]
+    #     elif period == "PM":
+    #         df = self.df_total[(self.df_total.index >= noon)]
+    #     else:
+    #         print("Period must be AM or PM")
+    #         return
 
-        if period == "AM":
-            df = self.df_total[(self.df_total.index < noon)]
-        elif period == "PM":
-            df = self.df_total[(self.df_total.index >= noon)]
-        else:
-            print("Period must be AM or PM")
-            return
+    #     final_15_min = df[["total_hourly"]].idxmax()[0]
 
-        final_15_min = df[["total_hourly"]].idxmax()[0]
+    #     end = final_15_min + timedelta(minutes=15)
+    #     start = end - timedelta(hours=1)
 
-        end = final_15_min + timedelta(minutes=15)
-        start = end - timedelta(hours=1)
+    #     return start, end
 
-        return start, end
+    # def peak_hour_text(self, period: str) -> str:
+    #     """
+    #     Make a nice text format for the peak hour range. Choose AM or PM.
 
-    def peak_hour_text(self, period: str) -> str:
-        """
-        Make a nice text format for the peak hour range. Choose AM or PM.
+    #     :param period: time of day, either 'AM' or 'PM'
+    #     :type period: str
+    #     :return: text of peak hour
+    #     :rtype: str
+    #     """
+    #     start, end = self.get_peak_hour(period)
 
-        :param period: time of day, either 'AM' or 'PM'
-        :type period: str
-        :return: text of peak hour
-        :rtype: str
-        """
-        start, end = self.get_peak_hour(period)
+    #     fmt = "%H:%M"
 
-        fmt = "%H:%M"
+    #     return f"{start.strftime(fmt)} to {end.strftime(fmt)}"
 
-        return f"{start.strftime(fmt)} to {end.strftime(fmt)}"
+    # def df_peak_hour(self, df: pd.DataFrame, period: str) -> pd.DataFrame:
 
-    def df_peak_hour(self, df: pd.DataFrame, period: str) -> pd.DataFrame:
+    #     start, end = self.get_peak_hour(period)
 
-        start, end = self.get_peak_hour(period)
+    #     # Filter the total dataframe by the start/end times
+    #     df_peak = df.loc[(df.index >= start) & (df.index < end)]
 
-        # Filter the total dataframe by the start/end times
-        df_peak = df.loc[(df.index >= start) & (df.index < end)]
+    #     # Delete the "total_hourly" column as it makes no sense to sum
+    #     del df_peak["total_hourly"]
 
-        # Delete the "total_hourly" column as it makes no sense to sum
-        del df_peak["total_hourly"]
+    #     return df_peak.sum().to_frame().T
 
-        return df_peak.sum().to_frame().T
+    # def df_peak_hour_heavy_pct(self, period: str) -> pd.DataFrame:
+    #     peak_total = self.df_peak_hour(self.df_total, period)
+    #     peak_light = self.df_peak_hour(self.df_cars, period)
 
-    def df_peak_hour_heavy_pct(self, period: str) -> pd.DataFrame:
-        peak_total = self.df_peak_hour(self.df_total, period)
-        peak_light = self.df_peak_hour(self.df_cars, period)
+    #     return (1 - peak_light / peak_total) * 100
 
-        return (1 - peak_light / peak_total) * 100
+    # def all_raw_data(self, summary_col: bool = False) -> pd.DataFrame:
+    #     """Combine the light and heavy tables together
+    #     into one table with LOTS of columns.
+    #     """
 
-    def all_raw_data(self, summary_col: bool = False) -> pd.DataFrame:
-        """Combine the light and heavy tables together
-        into one table with LOTS of columns.
-        """
+    #     # Add Light or Heavy as a prefix to the column names
+    #     df_cars = self.df_cars.rename(
+    #         columns={old: "Light " + old for old in self.df_cars.columns}
+    #     )
+    #     df_heavy = self.df_heavy.rename(
+    #         columns={old: "Heavy " + old for old in self.df_heavy.columns}
+    #     )
 
-        # Add Light or Heavy as a prefix to the column names
-        df_cars = self.df_cars.rename(
-            columns={old: "Light " + old for old in self.df_cars.columns}
-        )
-        df_heavy = self.df_heavy.rename(
-            columns={old: "Heavy " + old for old in self.df_heavy.columns}
-        )
+    #     # Concatenate the two dataframes together. They share the same index.
+    #     df = pd.concat([df_cars, df_heavy], axis=1, sort=False)
 
-        # Concatenate the two dataframes together. They share the same index.
-        df = pd.concat([df_cars, df_heavy], axis=1, sort=False)
+    #     if summary_col:
+    #         # Remove all columns except the 'total_15_min' columns
+    #         for col in df.columns:
+    #             if col not in ["Heavy total_15_min", "Light total_15_min"]:
+    #                 df.drop(col, axis=1, inplace=True)
 
-        if summary_col:
-            # Remove all columns except the 'total_15_min' columns
-            for col in df.columns:
-                if col not in ["Heavy total_15_min", "Light total_15_min"]:
-                    df.drop(col, axis=1, inplace=True)
+    #     else:
+    #         # Remove the 'total_' columns
+    #         for col in ["total_15_min", "total_hourly"]:
+    #             for wt in ["Light", "Heavy"]:
+    #                 df.drop(f"{wt} {col}", axis=1, inplace=True)
 
-        else:
-            # Remove the 'total_' columns
-            for col in ["total_15_min", "total_hourly"]:
-                for wt in ["Light", "Heavy"]:
-                    df.drop(f"{wt} {col}", axis=1, inplace=True)
+    #     return df
 
-        return df
+    # def filter_df_by_start_end_time(
+    #     self,
+    #     df,
+    #     start_time: str = "7:00",
+    #     end_time: str = "12:00",
+    #     as_type: str = "datetime",
+    # ):
+    #     # Parse the text input into usable values
+    #     # i.e. '5:15' -> 5, 15
+    #     a_hr, a_min = start_time.split(":")
+    #     b_hr, b_min = end_time.split(":")
 
-    def filter_df_by_start_end_time(
-        self,
-        df,
-        start_time: str = "7:00",
-        end_time: str = "12:00",
-        as_type: str = "datetime",
-    ):
-        # Parse the text input into usable values
-        # i.e. '5:15' -> 5, 15
-        a_hr, a_min = start_time.split(":")
-        b_hr, b_min = end_time.split(":")
+    #     # Build a datetime for the start and end windows
+    #     a_time = time(hour=int(a_hr), minute=int(a_min))
+    #     b_time = time(hour=int(b_hr), minute=int(b_min))
 
-        # Build a datetime for the start and end windows
-        a_time = time(hour=int(a_hr), minute=int(a_min))
-        b_time = time(hour=int(b_hr), minute=int(b_min))
+    #     if as_type == "datetime":
+    #         a = datetime.combine(self.date, a_time)
+    #         b = datetime.combine(self.date, b_time)
 
-        if as_type == "datetime":
-            a = datetime.combine(self.date, a_time)
-            b = datetime.combine(self.date, b_time)
+    #     else:
+    #         a = a_time
+    #         b = b_time
 
-        else:
-            a = a_time
-            b = b_time
+    #     # Filter the raw data by start and end windows
+    #     dff = df[(df.index >= a) & (df.index < b)]
 
-        # Filter the raw data by start and end windows
-        dff = df[(df.index >= a) & (df.index < b)]
-
-        return dff
+    #     return dff
 
     # def treemap_df(self,
     #                start_time: str = "7:00",
