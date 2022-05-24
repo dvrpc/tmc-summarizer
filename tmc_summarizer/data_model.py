@@ -162,39 +162,39 @@ class TMC_File:
 
         # # Calculate the percent heavy dataframe
         # # -------------------------------------
-        # self.df_pct_heavy = (1 - self.df_cars / self.df_total) * 100
+        self.df_pct_heavy = (1 - self.df_cars / self.df_total) * 100
 
         # # Expose all metadata as a dictionary and dataframe
         # # -------------------------------------------------
 
-        # self.meta = {
-        #     "location_id": self.location_id,
-        #     "location_name": self.location_name,
-        #     "date": self.date.strftime("%Y-%m-%d"),
-        #     "time": f"{self.start_time} to {self.end_time}",
-        #     "am_peak": self.peak_hour_text("AM"),
-        #     "pm_peak": self.peak_hour_text("PM"),
-        # }
+        self.meta = {
+            "location_id": self.location_id,
+            "location_name": self.location_name,
+            "date": self.date.strftime("%Y-%m-%d"),
+            "time": f"{self.start_time} to {self.end_time}",
+            "am_peak": self.peak_hour_text("AM"),
+            "pm_peak": self.peak_hour_text("PM"),
+        }
 
-        # for direction in ["NORTH", "SOUTH", "EAST", "WEST"]:
-        #     direction = f"{direction}BOUND STREET"
-        #     if direction in self.legs:
-        #         meta_name = f"leg_{direction[0].lower()}b"
-        #         self.meta[meta_name] = self.legs[direction]
+        for direction in ["NORTH", "SOUTH", "EAST", "WEST"]:
+            direction = f"{direction}BOUND STREET"
+            if direction in self.legs:
+                meta_name = f"leg_{direction[0].lower()}b"
+                self.meta[meta_name] = self.legs[direction]
 
-        # self.meta["filepath"] = str(self.filepath)
+        self.meta["filepath"] = str(self.filepath)
 
-        # self.df_meta = pd.Series(self.meta).to_frame().T
+        self.df_meta = pd.Series(self.meta).to_frame().T
 
-        # # Collect the peak hour data into a dictionary of dataframes
-        # # ----------------------------------------------------------
+        # Collect the peak hour data into a dictionary of dataframes
+        # ----------------------------------------------------------
 
-        # self.peak_data = {
-        #     "am_total": self.df_peak_hour(self.df_total, "AM"),
-        #     "am_heavy_pct": self.df_peak_hour_heavy_pct("AM"),
-        #     "pm_total": self.df_peak_hour(self.df_total, "PM"),
-        #     "pm_heavy_pct": self.df_peak_hour_heavy_pct("PM"),
-        # }
+        self.peak_data = {
+            "am_total": self.df_peak_hour(self.df_total, "AM"),
+            "am_heavy_pct": self.df_peak_hour_heavy_pct("AM"),
+            "pm_total": self.df_peak_hour(self.df_total, "PM"),
+            "pm_heavy_pct": self.df_peak_hour_heavy_pct("PM"),
+        }
 
     def read_data_tab(self, tabname: str) -> pd.DataFrame:
         """
@@ -221,6 +221,7 @@ class TMC_File:
             df.at[idx, "datetime"] = datetime.combine(self.date, row.time)
 
         del df["time"]
+        del df["date"]
 
         # Set the dataframe index to the timestamp
         df = df.set_index("datetime")
@@ -335,178 +336,178 @@ class TMC_File:
 
         return df
 
-    # def get_peak_hour(self, period: str) -> (datetime, datetime):
-    #     """
-    #     Identify start / end times of the AM or PM peak hour.
-    #     Return this information as a tuple with each value as a datetime.
+    def get_peak_hour(self, period: str) -> (datetime, datetime):
+        """
+        Identify start / end times of the AM or PM peak hour.
+        Return this information as a tuple with each value as a datetime.
 
-    #     :param period: time of day, either 'AM' or 'PM'
-    #     :type period: str
-    #     :return: tuple with (start_time, end_time)
-    #     :rtype: tuple with datetime
-    #     """
+        :param period: time of day, either 'AM' or 'PM'
+        :type period: str
+        :return: tuple with (start_time, end_time)
+        :rtype: tuple with datetime
+        """
 
-    #     period = period.upper()
+        period = period.upper()
 
-    #     noon = datetime.combine(self.date, time(hour=12))
+        noon = datetime.combine(self.date, time(hour=12))
 
-    #     if period == "AM":
-    #         df = self.df_total[(self.df_total.index < noon)]
-    #     elif period == "PM":
-    #         df = self.df_total[(self.df_total.index >= noon)]
-    #     else:
-    #         print("Period must be AM or PM")
-    #         return
+        if period == "AM":
+            df = self.df_total[(self.df_total.index < noon)]
+        elif period == "PM":
+            df = self.df_total[(self.df_total.index >= noon)]
+        else:
+            print("Period must be AM or PM")
+            return
 
-    #     final_15_min = df[["total_hourly"]].idxmax()[0]
+        final_15_min = df[["total_hourly"]].idxmax()[0]
 
-    #     end = final_15_min + timedelta(minutes=15)
-    #     start = end - timedelta(hours=1)
+        end = final_15_min + timedelta(minutes=15)
+        start = end - timedelta(hours=1)
 
-    #     return start, end
+        return start, end
 
-    # def peak_hour_text(self, period: str) -> str:
-    #     """
-    #     Make a nice text format for the peak hour range. Choose AM or PM.
+    def peak_hour_text(self, period: str) -> str:
+        """
+        Make a nice text format for the peak hour range. Choose AM or PM.
 
-    #     :param period: time of day, either 'AM' or 'PM'
-    #     :type period: str
-    #     :return: text of peak hour
-    #     :rtype: str
-    #     """
-    #     start, end = self.get_peak_hour(period)
+        :param period: time of day, either 'AM' or 'PM'
+        :type period: str
+        :return: text of peak hour
+        :rtype: str
+        """
+        start, end = self.get_peak_hour(period)
 
-    #     fmt = "%H:%M"
+        fmt = "%H:%M"
 
-    #     return f"{start.strftime(fmt)} to {end.strftime(fmt)}"
+        return f"{start.strftime(fmt)} to {end.strftime(fmt)}"
 
-    # def df_peak_hour(self, df: pd.DataFrame, period: str) -> pd.DataFrame:
+    def df_peak_hour(self, df: pd.DataFrame, period: str) -> pd.DataFrame:
 
-    #     start, end = self.get_peak_hour(period)
+        start, end = self.get_peak_hour(period)
 
-    #     # Filter the total dataframe by the start/end times
-    #     df_peak = df.loc[(df.index >= start) & (df.index < end)]
+        # Filter the total dataframe by the start/end times
+        df_peak = df.loc[(df.index >= start) & (df.index < end)]
 
-    #     # Delete the "total_hourly" column as it makes no sense to sum
-    #     del df_peak["total_hourly"]
+        # Delete the "total_hourly" column as it makes no sense to sum
+        del df_peak["total_hourly"]
 
-    #     return df_peak.sum().to_frame().T
+        return df_peak.sum().to_frame().T
 
-    # def df_peak_hour_heavy_pct(self, period: str) -> pd.DataFrame:
-    #     peak_total = self.df_peak_hour(self.df_total, period)
-    #     peak_light = self.df_peak_hour(self.df_cars, period)
+    def df_peak_hour_heavy_pct(self, period: str) -> pd.DataFrame:
+        peak_total = self.df_peak_hour(self.df_total, period)
+        peak_light = self.df_peak_hour(self.df_cars, period)
 
-    #     return (1 - peak_light / peak_total) * 100
+        return (1 - peak_light / peak_total) * 100
 
-    # def all_raw_data(self, summary_col: bool = False) -> pd.DataFrame:
-    #     """Combine the light and heavy tables together
-    #     into one table with LOTS of columns.
-    #     """
+    def all_raw_data(self, summary_col: bool = False) -> pd.DataFrame:
+        """Combine the light and heavy tables together
+        into one table with LOTS of columns.
+        """
 
-    #     # Add Light or Heavy as a prefix to the column names
-    #     df_cars = self.df_cars.rename(
-    #         columns={old: "Light " + old for old in self.df_cars.columns}
-    #     )
-    #     df_heavy = self.df_heavy.rename(
-    #         columns={old: "Heavy " + old for old in self.df_heavy.columns}
-    #     )
+        # Add Light or Heavy as a prefix to the column names
+        df_cars = self.df_cars.rename(
+            columns={old: "Light " + old for old in self.df_cars.columns}
+        )
+        df_heavy = self.df_heavy.rename(
+            columns={old: "Heavy " + old for old in self.df_heavy.columns}
+        )
 
-    #     # Concatenate the two dataframes together. They share the same index.
-    #     df = pd.concat([df_cars, df_heavy], axis=1, sort=False)
+        # Concatenate the two dataframes together. They share the same index.
+        df = pd.concat([df_cars, df_heavy], axis=1, sort=False)
 
-    #     if summary_col:
-    #         # Remove all columns except the 'total_15_min' columns
-    #         for col in df.columns:
-    #             if col not in ["Heavy total_15_min", "Light total_15_min"]:
-    #                 df.drop(col, axis=1, inplace=True)
+        if summary_col:
+            # Remove all columns except the 'total_15_min' columns
+            for col in df.columns:
+                if col not in ["Heavy total_15_min", "Light total_15_min"]:
+                    df.drop(col, axis=1, inplace=True)
 
-    #     else:
-    #         # Remove the 'total_' columns
-    #         for col in ["total_15_min", "total_hourly"]:
-    #             for wt in ["Light", "Heavy"]:
-    #                 df.drop(f"{wt} {col}", axis=1, inplace=True)
+        else:
+            # Remove the 'total_' columns
+            for col in ["total_15_min", "total_hourly"]:
+                for wt in ["Light", "Heavy"]:
+                    df.drop(f"{wt} {col}", axis=1, inplace=True)
 
-    #     return df
+        return df
 
-    # def filter_df_by_start_end_time(
-    #     self,
-    #     df,
-    #     start_time: str = "7:00",
-    #     end_time: str = "12:00",
-    #     as_type: str = "datetime",
-    # ):
-    #     # Parse the text input into usable values
-    #     # i.e. '5:15' -> 5, 15
-    #     a_hr, a_min = start_time.split(":")
-    #     b_hr, b_min = end_time.split(":")
+    def filter_df_by_start_end_time(
+        self,
+        df,
+        start_time: str = "7:00",
+        end_time: str = "12:00",
+        as_type: str = "datetime",
+    ):
+        # Parse the text input into usable values
+        # i.e. '5:15' -> 5, 15
+        a_hr, a_min = start_time.split(":")
+        b_hr, b_min = end_time.split(":")
 
-    #     # Build a datetime for the start and end windows
-    #     a_time = time(hour=int(a_hr), minute=int(a_min))
-    #     b_time = time(hour=int(b_hr), minute=int(b_min))
+        # Build a datetime for the start and end windows
+        a_time = time(hour=int(a_hr), minute=int(a_min))
+        b_time = time(hour=int(b_hr), minute=int(b_min))
 
-    #     if as_type == "datetime":
-    #         a = datetime.combine(self.date, a_time)
-    #         b = datetime.combine(self.date, b_time)
+        if as_type == "datetime":
+            a = datetime.combine(self.date, a_time)
+            b = datetime.combine(self.date, b_time)
 
-    #     else:
-    #         a = a_time
-    #         b = b_time
+        else:
+            a = a_time
+            b = b_time
 
-    #     # Filter the raw data by start and end windows
-    #     dff = df[(df.index >= a) & (df.index < b)]
+        # Filter the raw data by start and end windows
+        dff = df[(df.index >= a) & (df.index < b)]
 
-    #     return dff
+        return dff
 
-    # def treemap_df(self,
-    #                start_time: str = "7:00",
-    #                end_time: str = "12:00") -> pd.DataFrame:
-    #     """
-    #     Create a dataframe that can be dropped into a plotly treemap figure.
+    def treemap_df(self,
+                   start_time: str = "7:00",
+                   end_time: str = "12:00") -> pd.DataFrame:
+        """
+        Create a dataframe that can be dropped into a plotly treemap figure.
 
-    #     Using a start and end time filter, provide a single number for
-    #     movements, broken out by weight, leg, and movement.
+        Using a start and end time filter, provide a single number for
+        movements, broken out by weight, leg, and movement.
 
-    #     Usage
-    #     -----
-    #         >>> tmc = TMC_File('my/path.xls')
-    #         >>> df = tmc.treemap_df('3:00', '15:15')
-    #         >>> fig = px.treemap(df, path=['wt', 'leg', 'movement'], values=0)
+        Usage
+        -----
+            >>> tmc = TMC_File('my/path.xls')
+            >>> df = tmc.treemap_df('3:00', '15:15')
+            >>> fig = px.treemap(df, path=['wt', 'leg', 'movement'], values=0)
 
-    #     """
+        """
 
-    #     # Get the full raw dataset
-    #     df = self.all_raw_data()
+        # Get the full raw dataset
+        df = self.all_raw_data()
 
-    #     dff = self.filter_df_by_start_end_time(df, start_time=start_time, end_time=end_time)
+        dff = self.filter_df_by_start_end_time(df, start_time=start_time, end_time=end_time)
 
-    #     # Sum all values so there's one row instead of one for every 15 minutes
-    #     treemap_df = pd.DataFrame(dff.sum())
+        # Sum all values so there's one row instead of one for every 15 minutes
+        treemap_df = pd.DataFrame(dff.sum())
 
-    #     treemap_df.rename(columns={0: "total"}, inplace=True)
+        treemap_df.rename(columns={0: "total"}, inplace=True)
 
-    #     # Add labeling columns
-    #     treemap_df["full_movement"] = treemap_df.index
-    #     treemap_df["wt"] = ""
-    #     treemap_df["leg"] = ""
-    #     treemap_df["movement"] = ""
+        # Add labeling columns
+        treemap_df["full_movement"] = treemap_df.index
+        treemap_df["wt"] = ""
+        treemap_df["leg"] = ""
+        treemap_df["movement"] = ""
 
-    #     # Parse out the values for each row
-    #     for idx, row in treemap_df.iterrows():
-    #         split_value = idx.split(" ")
+        # Parse out the values for each row
+        for idx, row in treemap_df.iterrows():
+            split_value = idx.split(" ")
 
-    #         wt = split_value[0]
-    #         leg = split_value[1]
-    #         movement = " ".join(split_value[2:])
+            wt = split_value[0]
+            leg = split_value[1]
+            movement = " ".join(split_value[2:])
 
-    #         if 'Peds' in movement or 'Bikes' in movement:
-    #             wt = movement.split(' ')[0]
-    #             movement = 'Xwalk'
+            if 'Peds' in movement or 'Bikes' in movement:
+                wt = movement.split(' ')[0]
+                movement = 'Xwalk'
 
-    #         treemap_df.at[idx, "wt"] = wt
-    #         treemap_df.at[idx, "leg"] = leg
-    #         treemap_df.at[idx, "movement"] = movement
+            treemap_df.at[idx, "wt"] = wt
+            treemap_df.at[idx, "leg"] = leg
+            treemap_df.at[idx, "movement"] = movement
 
-    #     return treemap_df
+        return treemap_df
 
 
 def geocode_tmc(tmc: TMC_File, geocode_helper: str):
