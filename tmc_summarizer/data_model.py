@@ -81,9 +81,7 @@ class TMC_File:
         - sum the four 15-minute blocks in the AM and PM peaks
     """
 
-    def __init__(self,
-                 filepath: Union[Path, str],
-                 geocode_helper: str = None):
+    def __init__(self, filepath: Union[Path, str], geocode_helper: str = None):
 
         # Ensure filepath is a Path type and extract the ID
         # i.e. file name = "150315_ProjectNamePlaceName.xls"
@@ -101,24 +99,27 @@ class TMC_File:
             "sheet_name": "Information",
             "header": None,
             "usecols": "A:B",
-            "names": ["place_type", "place_name"]
+            "names": ["place_type", "place_name"],
         }
 
-        self.df_info_location = pd.read_excel(
-            self.filepath,
-            **location_kwargs
-        ).dropna()
+        self.df_info_location = pd.read_excel(self.filepath, **location_kwargs).dropna()
 
         # Load the INFORMATION tab data on date / time
         # --------------------------------------------
+        location_kwargs["skiprows"] = 1
+        location_kwargs["usecols"] = "D:G"
+        location_kwargs["names"] = ["count_no", "co_no_2", "date", "time"]
 
-        location_kwargs["usecols"] = "D:E"
-        location_kwargs["names"] = ["time_type", "time_value"]
-
-        self.df_info_time = pd.read_excel(
-            self.filepath,
-            **location_kwargs
-        ).dropna()
+        self.df_info_time = pd.read_excel(self.filepath, **location_kwargs)
+        self.df_info_time = self.df_info_time[self.df_info_time["count_no"].notna()]
+        self.df_info_time.drop(
+            self.df_info_time.tail(2).index, inplace=True
+        )  # drop last n rows
+        self.df_info_time.drop(
+            columns=["co_no_2"], inplace=True
+        )  # deals with exttra column due to merged cells
+        self.df_info_time = self.df_info_time.reset_index(inplace=False)
+        self.df_info_time.drop(columns=["index"], inplace=True)
 
         # Parse data from the INFO tab
         # ----------------------------
@@ -134,32 +135,37 @@ class TMC_File:
 
             if row.place_type == "Intersection Name":
                 self.location_name = row.place_name
+            elif row.place_type == "City":
+                self.city_name = row.place_name
+            elif row.place_type == "State":
+                self.state_name = row.place_name
             else:
                 self.legs[row.place_type.upper()] = row.place_name
 
         # Get the date and start/end times
         for _, row in self.df_info_time.iterrows():
 
-            if row.time_type == "Date":
-                self.date = row.time_value
-            elif row.time_type == "Start Time":
-                self.start_time = row.time_value
-            elif row.time_type == "End Time":
-                self.end_time = row.time_value
+            if row.count_no == "Date and Time of Start of Count 1":
+                self.date = row.date
+                self.start_time = row.time
+            elif row.count_no == "Date and Time of End of Count 1":
+                self.end_date = row.date
+                self.end_time = row.time
 
         # Read the DATA tabs into dataframes
         # ----------------------------------
 
-        self.df_light = self.read_data_tab("Light Vehicles")
+        self.df_cars = self.read_data_tab("Cars")
         self.df_heavy = self.read_data_tab("Heavy Vehicles")
-        self.df_total = self.read_data_tab("Total Vehicles")
+        # self.bikes = self.read_data_tab("Bicycles")
+        self.df_total = self.read_data_tab("TOTAL")
 
-        # Calculate the percent heavy dataframe
-        # -------------------------------------
-        self.df_pct_heavy = (1 - self.df_light / self.df_total) * 100
+        # # Calculate the percent heavy dataframe
+        # # -------------------------------------
+        self.df_pct_heavy = (1 - self.df_cars / self.df_total) * 100
 
-        # Expose all metadata as a dictionary and dataframe
-        # -------------------------------------------------
+        # # Expose all metadata as a dictionary and dataframe
+        # # -------------------------------------------------
 
         self.meta = {
             "location_id": self.location_id,
@@ -195,32 +201,27 @@ class TMC_File:
         Generic function to read data from any of the vehicle tabs.
         """
 
-        df = pd.read_excel(self.filepath,
-                           skiprows=3,
-                           header=None,
-                           names=self.flatten_headers(tabname),
-                           sheet_name=tabname).dropna()
+        df = pd.read_excel(
+            self.filepath,
+            skiprows=3,
+            header=None,
+            names=self.flatten_headers(tabname),
+            sheet_name=tabname
+        ).dropna(subset=['SB U'])
 
-        # Check all time values and ensure that each one
-        # is formatted as a datetime.time. Some aren't by default!
-        for idx, row in df.iterrows():
-
-            if type(row.time) != time:
-
-                hour, minute = row.time.split(":")
-
-                df.at[idx, "time"] = time(
-                    hour=int(hour),
-                    minute=int(minute)
-                )
-
-        # Now force all times into datetime
         df["datetime"] = None
 
         for idx, row in df.iterrows():
+            date_holder = self.date
+            date_holder = datetime.date(date_holder)
+            try:
+                row.time = datetime.time(row.time)
+            except: 
+                row.time = row.time
             df.at[idx, "datetime"] = datetime.combine(self.date, row.time)
 
         del df["time"]
+        del df["date"]
 
         # Set the dataframe index to the timestamp
         df = df.set_index("datetime")
@@ -243,7 +244,7 @@ class TMC_File:
             "Southbound": "SB ",
             "Westbound": "WB ",
             "Northbound": "NB ",
-            "Eastbound": "EB "
+            "Eastbound": "EB ",
         }
 
         replacements_level_2 = {
@@ -251,20 +252,18 @@ class TMC_File:
             "left turns": "Left",
             "straight through": "Thru",
             "right turns": "Right",
-            "peds in crosswalk": "Peds Xwalk",
+            "ped crossings": "Peds Xwalk",
             "bikes in crosswalk": "Bikes Xwalk",
+            "bicycles in crosswalk": "Bikes Xwalk",
             "time": "time",
-
+            "date": "date",
             # handle the expected typos!
             "bikes in croswalk": "Bikes Xwalk",
             "peds in croswalk": "Peds Xwalk",
+            "crosswalk crossings": "Xwalk Xings",
         }
 
-        df = pd.read_excel(self.filepath,
-                           nrows=3,
-                           header=None,
-                           sheet_name=tabname)
-
+        df = pd.read_excel(self.filepath, nrows=3, header=None, sheet_name=tabname)
         headers = []
 
         # Start off with a blank l1
@@ -273,7 +272,6 @@ class TMC_File:
         for col in df.columns:
             level_1 = df.at[1, col]
             level_2 = df.at[2, col]
-
             # Update the l1 anytime a value is found
             if not pd.isna(level_1):
                 l1 = replacements_level_1[level_1]
@@ -315,7 +313,6 @@ class TMC_File:
         value on any row represents that 15-minute timeperiod plus
         the three other 15-minute blocks prior.
 
-
         :param df: input dataframe
         :type df: pd.DataFrame
         :return: modified dataframe with new column
@@ -332,8 +329,7 @@ class TMC_File:
             start = end - timedelta(hours=1)
 
             hourly_total = df.iloc[
-                (df.index >= start) & (df.index < end),
-                col_idx_15_min
+                (df.index >= start) & (df.index < end), col_idx_15_min
             ].sum()
 
             df.at[idx, "total_hourly"] = hourly_total
@@ -385,18 +381,12 @@ class TMC_File:
 
         return f"{start.strftime(fmt)} to {end.strftime(fmt)}"
 
-    def df_peak_hour(self,
-                     df: pd.DataFrame,
-                     period: str) -> pd.DataFrame:
+    def df_peak_hour(self, df: pd.DataFrame, period: str) -> pd.DataFrame:
 
         start, end = self.get_peak_hour(period)
 
         # Filter the total dataframe by the start/end times
-        df_peak = df.loc[
-            (df.index >= start)
-            &
-            (df.index < end)
-        ]
+        df_peak = df.loc[(df.index >= start) & (df.index < end)]
 
         # Delete the "total_hourly" column as it makes no sense to sum
         del df_peak["total_hourly"]
@@ -405,30 +395,30 @@ class TMC_File:
 
     def df_peak_hour_heavy_pct(self, period: str) -> pd.DataFrame:
         peak_total = self.df_peak_hour(self.df_total, period)
-        peak_light = self.df_peak_hour(self.df_light, period)
+        peak_light = self.df_peak_hour(self.df_cars, period)
 
         return (1 - peak_light / peak_total) * 100
 
     def all_raw_data(self, summary_col: bool = False) -> pd.DataFrame:
-        """ Combine the light and heavy tables together
+        """Combine the light and heavy tables together
         into one table with LOTS of columns.
         """
 
         # Add Light or Heavy as a prefix to the column names
-        df_light = self.df_light.rename(
-            columns={old: "Light " + old for old in self.df_light.columns}
+        df_cars = self.df_cars.rename(
+            columns={old: "Light " + old for old in self.df_cars.columns}
         )
         df_heavy = self.df_heavy.rename(
             columns={old: "Heavy " + old for old in self.df_heavy.columns}
         )
-        
+
         # Concatenate the two dataframes together. They share the same index.
-        df = pd.concat([df_light, df_heavy], axis=1, sort=False)
-        
+        df = pd.concat([df_cars, df_heavy], axis=1, sort=False)
+
         if summary_col:
             # Remove all columns except the 'total_15_min' columns
             for col in df.columns:
-                if col not in  ["Heavy total_15_min", "Light total_15_min"]:
+                if col not in ["Heavy total_15_min", "Light total_15_min"]:
                     df.drop(col, axis=1, inplace=True)
 
         else:
@@ -439,11 +429,13 @@ class TMC_File:
 
         return df
 
-    def filter_df_by_start_end_time(self,
-                                    df,
-                                    start_time: str = "7:00",
-                                    end_time: str = "12:00",
-                                    as_type: str = "datetime"):
+    def filter_df_by_start_end_time(
+        self,
+        df,
+        start_time: str = "7:00",
+        end_time: str = "12:00",
+        as_type: str = "datetime",
+    ):
         # Parse the text input into usable values
         # i.e. '5:15' -> 5, 15
         a_hr, a_min = start_time.split(":")
@@ -510,12 +502,13 @@ class TMC_File:
             if 'Peds' in movement or 'Bikes' in movement:
                 wt = movement.split(' ')[0]
                 movement = 'Xwalk'
-            
+
             treemap_df.at[idx, "wt"] = wt
             treemap_df.at[idx, "leg"] = leg
             treemap_df.at[idx, "movement"] = movement
 
         return treemap_df
+
 
 def geocode_tmc(tmc: TMC_File, geocode_helper: str):
     """
