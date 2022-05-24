@@ -156,9 +156,9 @@ class TMC_File:
         # ----------------------------------
 
         self.df_cars = self.read_data_tab("Cars")
-        # self.df_heavy = self.read_data_tab("Heavy Vehicles")
+        self.df_heavy = self.read_data_tab("Heavy Vehicles")
         # self.bikes = self.read_data_tab("Bicycles")
-        # self.df_total = self.read_data_tab("Total Vehicles")
+        self.df_total = self.read_data_tab("TOTAL")
 
         # # Calculate the percent heavy dataframe
         # # -------------------------------------
@@ -206,23 +206,18 @@ class TMC_File:
             skiprows=3,
             header=None,
             names=self.flatten_headers(tabname),
-            sheet_name=tabname,
-        )
+            sheet_name=tabname
+        ).dropna(subset=['SB U'])
 
-        # Check all time values and ensure that each one
-        # is formatted as a datetime.time. Some aren't by default!
-        # for idx, row in df.iterrows():
-        #     if type(row.time) != time:
-        #         hour, minute = row.time.split(":")
-        #         df.at[idx, "time"] = time(hour=int(hour), minute=int(minute))
-
-        # Now force all times into datetime
         df["datetime"] = None
 
         for idx, row in df.iterrows():
             date_holder = self.date
             date_holder = datetime.date(date_holder)
-            row.time = datetime.time(row.time)
+            try:
+                row.time = datetime.time(row.time)
+            except: 
+                row.time = row.time
             df.at[idx, "datetime"] = datetime.combine(self.date, row.time)
 
         del df["time"]
@@ -231,7 +226,7 @@ class TMC_File:
         df = df.set_index("datetime")
 
         df = self.add_15_min_totals(df)
-        # df = self.add_hourly_totals(df)
+        df = self.add_hourly_totals(df)
 
         return df
 
@@ -264,6 +259,7 @@ class TMC_File:
             # handle the expected typos!
             "bikes in croswalk": "Bikes Xwalk",
             "peds in croswalk": "Peds Xwalk",
+            "crosswalk crossings": "Xwalk Xings",
         }
 
         df = pd.read_excel(self.filepath, nrows=3, header=None, sheet_name=tabname)
@@ -309,35 +305,35 @@ class TMC_File:
 
         return df
 
-    # def add_hourly_totals(self, df: pd.DataFrame) -> pd.DataFrame:
-    #     """
-    #     Add a column named 'total_hourly' that sums 15-minute
-    #     volumes for a 1-hour period. It works backwards, so the
-    #     value on any row represents that 15-minute timeperiod plus
-    #     the three other 15-minute blocks prior.
+    def add_hourly_totals(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Add a column named 'total_hourly' that sums 15-minute
+        volumes for a 1-hour period. It works backwards, so the
+        value on any row represents that 15-minute timeperiod plus
+        the three other 15-minute blocks prior.
 
-    #     :param df: input dataframe
-    #     :type df: pd.DataFrame
-    #     :return: modified dataframe with new column
-    #     :rtype: pd.DataFrame
-    #     """
+        :param df: input dataframe
+        :type df: pd.DataFrame
+        :return: modified dataframe with new column
+        :rtype: pd.DataFrame
+        """
 
-    #     # Get the column index for the 15 minute totals
-    #     col_idx_15_min = df.columns.get_loc("total_15_min")
+        # Get the column index for the 15 minute totals
+        col_idx_15_min = df.columns.get_loc("total_15_min")
 
-    #     df["total_hourly"] = 0
+        df["total_hourly"] = 0
 
-    #     for idx, row in df.iterrows():
-    #         end = idx + timedelta(minutes=15)
-    #         start = end - timedelta(hours=1)
+        for idx, row in df.iterrows():
+            end = idx + timedelta(minutes=15)
+            start = end - timedelta(hours=1)
 
-    #         hourly_total = df.iloc[
-    #             (df.index >= start) & (df.index < end), col_idx_15_min
-    #         ].sum()
+            hourly_total = df.iloc[
+                (df.index >= start) & (df.index < end), col_idx_15_min
+            ].sum()
 
-    #         df.at[idx, "total_hourly"] = hourly_total
+            df.at[idx, "total_hourly"] = hourly_total
 
-    #     return df
+        return df
 
     # def get_peak_hour(self, period: str) -> (datetime, datetime):
     #     """
