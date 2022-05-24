@@ -207,23 +207,22 @@ class TMC_File:
             header=None,
             names=self.flatten_headers(tabname),
             sheet_name=tabname,
-        ).dropna()
+        )
 
         # Check all time values and ensure that each one
         # is formatted as a datetime.time. Some aren't by default!
-        for idx, row in df.iterrows():
-            if type(row.time) == datetime:
-                row.time
-            elif type(row.time) != time:
-                print(row.time)
-                print(type(row.time))
-            # hour, minute = row.time.split(":")
-            # df.at[idx, "time"] = time(hour=int(hour), minute=int(minute))
+        # for idx, row in df.iterrows():
+        #     if type(row.time) != time:
+        #         hour, minute = row.time.split(":")
+        #         df.at[idx, "time"] = time(hour=int(hour), minute=int(minute))
 
         # Now force all times into datetime
         df["datetime"] = None
 
         for idx, row in df.iterrows():
+            date_holder = self.date
+            date_holder = datetime.date(date_holder)
+            row.time = datetime.time(row.time)
             df.at[idx, "datetime"] = datetime.combine(self.date, row.time)
 
         del df["time"]
@@ -232,7 +231,7 @@ class TMC_File:
         df = df.set_index("datetime")
 
         df = self.add_15_min_totals(df)
-        df = self.add_hourly_totals(df)
+        # df = self.add_hourly_totals(df)
 
         return df
 
@@ -293,22 +292,22 @@ class TMC_File:
 
         return headers
 
-    # def add_15_min_totals(self, df: pd.DataFrame) -> pd.DataFrame:
-    #     """
-    #     Add a column named 'total_15_min' that sums volumes
-    #     from each of the other columns, for each row.
+    def add_15_min_totals(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Add a column named 'total_15_min' that sums volumes
+        from each of the other columns, for each row.
 
-    #     :param df: input dataframe
-    #     :type df: pd.DataFrame
-    #     :return: modified dataframe with new column
-    #     :rtype: pd.DataFrame
-    #     """
-    #     # TODO: qa that this is right from Excel
+        :param df: input dataframe
+        :type df: pd.DataFrame
+        :return: modified dataframe with new column
+        :rtype: pd.DataFrame
+        """
+        # TODO: qa that this is right from Excel
 
-    #     # For each row, sum all columns and put the result into "total_15_min"
-    #     df["total_15_min"] = df.iloc[:, :].sum(axis=1)
+        # For each row, sum all columns and put the result into "total_15_min"
+        df["total_15_min"] = df.iloc[:, :].sum(axis=1)
 
-    #     return df
+        return df
 
     # def add_hourly_totals(self, df: pd.DataFrame) -> pd.DataFrame:
     #     """
