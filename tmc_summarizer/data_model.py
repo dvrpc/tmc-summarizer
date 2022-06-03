@@ -152,13 +152,20 @@ class TMC_File:
                 self.end_date = row.date
                 self.end_time = row.time
 
+        # Set the order of the columns (eb, wb, nb, sb)
+        self.total_cols = ['EB U', 'EB Left', 'EB Thru', 'EB Right', 'EB Xwalk Xings','WB U', 'WB Left', 'WB Thru', 'WB Right', 'WB Xwalk Xings', 'NB U', 'NB Left', 'NB Thru', 'NB Right', 'NB Xwalk Xings', 'SB U', 'SB Left', 'SB Thru', 'SB Right', 'SB Xwalk Xings', 'total_15_min', 'total_hourly']
+        self.car_cols = ['EB U', 'EB Left', 'EB Thru', 'EB Right', 'EB Peds Xwalk','WB U', 'WB Left', 'WB Thru', 'WB Right', 'WB Peds Xwalk', 'NB U', 'NB Left', 'NB Thru', 'NB Right', 'NB Peds Xwalk', 'SB U', 'SB Left', 'SB Thru', 'SB Right', 'SB Peds Xwalk', 'total_15_min', 'total_hourly']
+        self.heavy_cols = ['EB U', 'EB Left', 'EB Thru', 'EB Right', 'EB Bikes Xwalk','WB U', 'WB Left', 'WB Thru', 'WB Right', 'WB Bikes Xwalk', 'NB U', 'NB Left', 'NB Thru', 'NB Right', 'NB Bikes Xwalk', 'SB U', 'SB Left', 'SB Thru', 'SB Right', 'SB Bikes Xwalk', 'total_15_min', 'total_hourly']
+        
         # Read the DATA tabs into dataframes
         # ----------------------------------
-
         self.df_cars = self.read_data_tab("Cars")
+        self.df_cars = self.df_cars[self.car_cols]
         self.df_heavy = self.read_data_tab("Heavy Vehicles")
+        self.df_heavy = self.df_heavy[self.heavy_cols]
         # self.bikes = self.read_data_tab("Bicycles")
         self.df_total = self.read_data_tab("TOTAL")
+        self.df_total = self.df_total[self.total_cols]
 
         # # Calculate the percent heavy dataframe
         # # -------------------------------------
