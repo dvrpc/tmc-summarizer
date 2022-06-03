@@ -181,6 +181,8 @@ class TMC_File:
             "time": f"{self.start_time} to {self.end_time}",
             "am_peak": self.peak_hour_text("AM"),
             "pm_peak": self.peak_hour_text("PM"),
+            "am_peak_raw": self.get_peak_hour("AM"),
+            "pm_peak_raw": self.get_peak_hour("PM"),
         }
 
         for direction in ["NORTH", "SOUTH", "EAST", "WEST"]:
