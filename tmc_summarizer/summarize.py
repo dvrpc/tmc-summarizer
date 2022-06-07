@@ -27,12 +27,13 @@ Usage
 
 import pandas as pd
 import geopandas as gpd
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Union
 
 from tmc_summarizer.data_model import TMC_File, geocode_tmc
 from tmc_summarizer.helpers import zip_files
+import statistics
 
 
 def files_to_process(folder: Path) -> list:
@@ -49,7 +50,7 @@ def files_to_process(folder: Path) -> list:
     """
 
     # Get a list of all .xls files in the folder
-    files = list(folder.glob('**/*.xls'))
+    files = list(folder.glob("**/*.xls"))
 
     # Remove any files that don't have proper naming conventions
     for f in files:
@@ -72,9 +73,11 @@ def files_to_process(folder: Path) -> list:
     return files
 
 
-def write_summary_file(input_folder: Union[Path, str],
-                       output_folder: Union[Path, str] = None,
-                       geocode_helper: str = None) -> Path:
+def write_summary_file(
+    input_folder: Union[Path, str],
+    output_folder: Union[Path, str] = None,
+    geocode_helper: str = None,
+) -> Path:
     """
     Create a new ``.xlsx`` summary file.
 
@@ -105,6 +108,10 @@ def write_summary_file(input_folder: Union[Path, str],
     metadata = []
     detailed_data = []
 
+    # these two lists exist to add the peak hours, in seconds, so they can be averaged for the network later
+    am_peak_hour_list = []
+    pm_peak_hour_list = []
+
     input_folder = Path(input_folder)
 
     # Use the specified output folder
@@ -118,7 +125,9 @@ def write_summary_file(input_folder: Union[Path, str],
     now_txt_2 = start_time.strftime("%Y_%m_%d_%H_%M_%S")
 
     output_xlsx_filepath = output_folder / ("TMC Summary " + now_txt_1 + ".xlsx")
-    output_geojson_filepath = output_folder / ("tmc_locations_" + now_txt_2 + ".geojson")
+    output_geojson_filepath = output_folder / (
+        "tmc_locations_" + now_txt_2 + ".geojson"
+    )
     output_zip_file = output_folder / ("tmc_summary_" + now_txt_2 + ".zip")
 
     all_tmcs = []
@@ -134,6 +143,16 @@ def write_summary_file(input_folder: Union[Path, str],
         # -> (am_total, am_heavy_pct, pm_total, pm_heavy_pct)
 
         for timeperiod in ["am", "pm"]:
+            meta_data_peak = list(tmc.df_meta.loc[:, f"{timeperiod}_peak_raw"])
+            time = meta_data_peak[0][0].to_pydatetime()
+            seconds = (time.hour * 60 + time.minute) * 60 + time.second
+            if timeperiod == "am":
+                am_peak_hour_list.append(seconds)
+            elif timeperiod == "pm":
+                pm_peak_hour_list.append(seconds)
+            else:
+                print("Not a valid time period")
+
             for dtype in ["total", "heavy_pct"]:
                 identifier = f"{timeperiod}_{dtype}"
 
@@ -141,6 +160,9 @@ def write_summary_file(input_folder: Union[Path, str],
                 df = tmc.peak_data[identifier]
 
                 # Insert data into extra columns up front
+                df.insert(
+                    0, "peak_hour_factor", tmc.meta[f"{timeperiod}_peak_hour_factor"]
+                )
                 df.insert(0, "time", tmc.meta[f"{timeperiod}_peak"])
                 df.insert(0, "period", timeperiod)
                 df.insert(0, "dtype", dtype)
@@ -155,11 +177,31 @@ def write_summary_file(input_folder: Union[Path, str],
     df_meta = pd.concat(metadata)
     df_detail = pd.concat(detailed_data)
 
+    # Add network peak hour in a nice format
+    am_peak_hr_seconds = statistics.median(am_peak_hour_list)
+    am_end = am_peak_hr_seconds + 3600
+    pm_peak_hr_seconds = statistics.median(pm_peak_hour_list)
+    pm_end = pm_peak_hr_seconds + 3600
+
+    am_network_peak_hour = str(timedelta(seconds=am_peak_hr_seconds))
+    am_network_end = str(timedelta(seconds=am_end))
+    pm_network_peak_hour = str(timedelta(seconds=pm_peak_hr_seconds))
+    pm_network_end = str(timedelta(seconds=pm_end))
+
+    df_meta = df_meta.drop(columns=["am_peak_raw", "pm_peak_raw"])
+    df_meta.insert(
+        4, "pm_network_peak", (f"{pm_network_peak_hour} to {pm_network_end}")
+    )
+    df_meta.insert(
+        4, "am_network_peak", (f"{am_network_peak_hour} to {am_network_end}")
+    )
+    df_meta = df_meta.drop(columns=["am_peak_hour_factor", "pm_peak_hour_factor"])
+
     # Write Summary and Detail tabs out to file
-    writer = pd.ExcelWriter(output_xlsx_filepath, engine='xlsxwriter')
+    writer = pd.ExcelWriter(output_xlsx_filepath, engine="xlsxwriter")
 
     workbook = writer.book
-    header_format = workbook.add_format({'bold': True, 'font_size': 18})
+    header_format = workbook.add_format({"bold": True, "font_size": 18})
 
     df_meta.to_excel(writer, sheet_name="Summary")
     df_detail.to_excel(writer, sheet_name="Detail")
@@ -170,11 +212,7 @@ def write_summary_file(input_folder: Union[Path, str],
     # Write raw data tabs
     for tmc in all_tmcs:
 
-        kwargs = {
-            "sheet_name": tmc.location_id,
-            "startrow": 1,
-            "startcol": 0
-        }
+        kwargs = {"sheet_name": tmc.location_id, "startrow": 1, "startcol": 0}
 
         tmc.df_total.to_excel(writer, **kwargs)
 
@@ -215,7 +253,7 @@ def write_summary_file(input_folder: Union[Path, str],
         df = pd.DataFrame([tmc.meta for tmc in all_tmcs])
         gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.lon, df.lat))
 
-        gdf.to_file(output_geojson_filepath, driver='GeoJSON')
+        gdf.to_file(output_geojson_filepath, driver="GeoJSON")
         print(f"-> Wrote point geojson to {output_geojson_filepath}")
 
         # files_to_zip.append(output_geojson_filepath)

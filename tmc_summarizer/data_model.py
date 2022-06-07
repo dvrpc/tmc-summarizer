@@ -153,10 +153,79 @@ class TMC_File:
                 self.end_time = row.time
 
         # Set the order of the columns (eb, wb, nb, sb)
-        self.total_cols = ['EB U', 'EB Left', 'EB Thru', 'EB Right', 'EB Xwalk Xings','WB U', 'WB Left', 'WB Thru', 'WB Right', 'WB Xwalk Xings', 'NB U', 'NB Left', 'NB Thru', 'NB Right', 'NB Xwalk Xings', 'SB U', 'SB Left', 'SB Thru', 'SB Right', 'SB Xwalk Xings', 'total_15_min', 'total_hourly']
-        self.car_cols = ['EB U', 'EB Left', 'EB Thru', 'EB Right', 'EB Peds Xwalk','WB U', 'WB Left', 'WB Thru', 'WB Right', 'WB Peds Xwalk', 'NB U', 'NB Left', 'NB Thru', 'NB Right', 'NB Peds Xwalk', 'SB U', 'SB Left', 'SB Thru', 'SB Right', 'SB Peds Xwalk', 'total_15_min', 'total_hourly']
-        self.heavy_cols = ['EB U', 'EB Left', 'EB Thru', 'EB Right', 'EB Bikes Xwalk','WB U', 'WB Left', 'WB Thru', 'WB Right', 'WB Bikes Xwalk', 'NB U', 'NB Left', 'NB Thru', 'NB Right', 'NB Bikes Xwalk', 'SB U', 'SB Left', 'SB Thru', 'SB Right', 'SB Bikes Xwalk', 'total_15_min', 'total_hourly']
-        
+        self.total_cols = [
+            "EB U",
+            "EB Left",
+            "EB Thru",
+            "EB Right",
+            "EB Xwalk Xings",
+            "WB U",
+            "WB Left",
+            "WB Thru",
+            "WB Right",
+            "WB Xwalk Xings",
+            "NB U",
+            "NB Left",
+            "NB Thru",
+            "NB Right",
+            "NB Xwalk Xings",
+            "SB U",
+            "SB Left",
+            "SB Thru",
+            "SB Right",
+            "SB Xwalk Xings",
+            "total_15_min",
+            "total_hourly",
+        ]
+        self.car_cols = [
+            "EB U",
+            "EB Left",
+            "EB Thru",
+            "EB Right",
+            "EB Peds Xwalk",
+            "WB U",
+            "WB Left",
+            "WB Thru",
+            "WB Right",
+            "WB Peds Xwalk",
+            "NB U",
+            "NB Left",
+            "NB Thru",
+            "NB Right",
+            "NB Peds Xwalk",
+            "SB U",
+            "SB Left",
+            "SB Thru",
+            "SB Right",
+            "SB Peds Xwalk",
+            "total_15_min",
+            "total_hourly",
+        ]
+        self.heavy_cols = [
+            "EB U",
+            "EB Left",
+            "EB Thru",
+            "EB Right",
+            "EB Bikes Xwalk",
+            "WB U",
+            "WB Left",
+            "WB Thru",
+            "WB Right",
+            "WB Bikes Xwalk",
+            "NB U",
+            "NB Left",
+            "NB Thru",
+            "NB Right",
+            "NB Bikes Xwalk",
+            "SB U",
+            "SB Left",
+            "SB Thru",
+            "SB Right",
+            "SB Bikes Xwalk",
+            "total_15_min",
+            "total_hourly",
+        ]
+
         # Read the DATA tabs into dataframes
         # ----------------------------------
         self.df_cars = self.read_data_tab("Cars")
@@ -181,6 +250,10 @@ class TMC_File:
             "time": f"{self.start_time} to {self.end_time}",
             "am_peak": self.peak_hour_text("AM"),
             "pm_peak": self.peak_hour_text("PM"),
+            "am_peak_raw": self.get_peak_hour("AM"),
+            "pm_peak_raw": self.get_peak_hour("PM"),
+            "am_peak_hour_factor": self.peak_hour_factor("AM"),
+            "pm_peak_hour_factor": self.peak_hour_factor("PM"),
         }
 
         for direction in ["NORTH", "SOUTH", "EAST", "WEST"]:
@@ -213,9 +286,9 @@ class TMC_File:
             skiprows=3,
             header=None,
             names=self.flatten_headers(tabname),
-            sheet_name=tabname
-        ).dropna(subset=['SB U'])
-
+            sheet_name=tabname,
+        ).dropna(subset=["SB U"])
+        df = df[:96]  # note: this cuts off subsequent days, will need to be refactored
         df["datetime"] = None
 
         for idx, row in df.iterrows():
@@ -223,7 +296,7 @@ class TMC_File:
             date_holder = datetime.date(date_holder)
             try:
                 row.time = datetime.time(row.time)
-            except: 
+            except:
                 row.time = row.time
             df.at[idx, "datetime"] = datetime.combine(self.date, row.time)
 
@@ -343,7 +416,7 @@ class TMC_File:
 
         return df
 
-    def get_peak_hour(self, period: str) -> (datetime, datetime):
+    def get_peak_hour(self, period: str):
         """
         Identify start / end times of the AM or PM peak hour.
         Return this information as a tuple with each value as a datetime.
@@ -372,6 +445,27 @@ class TMC_File:
         start = end - timedelta(hours=1)
 
         return start, end
+
+    def peak_hour_factor(self, period: str):
+
+        noon = datetime.combine(self.date, time(hour=12))
+        period = period.upper()
+
+        if period == "AM":
+            df = self.df_total[self.df_total.index < noon]
+        elif period == "PM":
+            df = self.df_total[self.df_total.index >= noon]
+        else:
+            print("Period must be AM or PM")
+            return
+        index_maximum = df["total_hourly"].idxmax()
+        df2 = df.loc[df.index <= index_maximum].tail(4)
+
+        fifteen_min_peaks = list(df2["total_15_min"])
+        hourlymax = df2["total_hourly"].max()
+
+        peak_hour_factor = hourlymax / (4 * max(fifteen_min_peaks))
+        return peak_hour_factor
 
     def peak_hour_text(self, period: str) -> str:
         """
@@ -465,9 +559,9 @@ class TMC_File:
 
         return dff
 
-    def treemap_df(self,
-                   start_time: str = "7:00",
-                   end_time: str = "12:00") -> pd.DataFrame:
+    def treemap_df(
+        self, start_time: str = "7:00", end_time: str = "12:00"
+    ) -> pd.DataFrame:
         """
         Create a dataframe that can be dropped into a plotly treemap figure.
 
@@ -485,7 +579,9 @@ class TMC_File:
         # Get the full raw dataset
         df = self.all_raw_data()
 
-        dff = self.filter_df_by_start_end_time(df, start_time=start_time, end_time=end_time)
+        dff = self.filter_df_by_start_end_time(
+            df, start_time=start_time, end_time=end_time
+        )
 
         # Sum all values so there's one row instead of one for every 15 minutes
         treemap_df = pd.DataFrame(dff.sum())
@@ -506,9 +602,9 @@ class TMC_File:
             leg = split_value[1]
             movement = " ".join(split_value[2:])
 
-            if 'Peds' in movement or 'Bikes' in movement:
-                wt = movement.split(' ')[0]
-                movement = 'Xwalk'
+            if "Peds" in movement or "Bikes" in movement:
+                wt = movement.split(" ")[0]
+                movement = "Xwalk"
 
             treemap_df.at[idx, "wt"] = wt
             treemap_df.at[idx, "leg"] = leg
