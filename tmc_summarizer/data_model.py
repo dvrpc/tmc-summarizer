@@ -281,14 +281,14 @@ class TMC_File:
         Generic function to read data from any of the vehicle tabs.
         """
 
-        df1 = pd.read_excel(
+        df = pd.read_excel(
             self.filepath,
             skiprows=3,
             header=None,
             names=self.flatten_headers(tabname),
             sheet_name=tabname,
         ).dropna(subset=["SB U"])
-        df = df1[:96]  # note: this cuts off subsequent days, will need to be refactored
+        df = df[:96]  # note: this cuts off subsequent days, will need to be refactored
         df["datetime"] = None
 
         for idx, row in df.iterrows():
