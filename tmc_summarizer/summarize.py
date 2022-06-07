@@ -160,6 +160,9 @@ def write_summary_file(
                 df = tmc.peak_data[identifier]
 
                 # Insert data into extra columns up front
+                df.insert(
+                    0, "peak_hour_factor", tmc.meta[f"{timeperiod}_peak_hour_factor"]
+                )
                 df.insert(0, "time", tmc.meta[f"{timeperiod}_peak"])
                 df.insert(0, "period", timeperiod)
                 df.insert(0, "dtype", dtype)

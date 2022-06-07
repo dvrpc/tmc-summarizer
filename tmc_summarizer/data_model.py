@@ -252,6 +252,8 @@ class TMC_File:
             "pm_peak": self.peak_hour_text("PM"),
             "am_peak_raw": self.get_peak_hour("AM"),
             "pm_peak_raw": self.get_peak_hour("PM"),
+            "am_peak_hour_factor": self.peak_hour_factor("AM"),
+            "pm_peak_hour_factor": self.peak_hour_factor("PM"),
         }
 
         for direction in ["NORTH", "SOUTH", "EAST", "WEST"]:
@@ -279,14 +281,14 @@ class TMC_File:
         Generic function to read data from any of the vehicle tabs.
         """
 
-        df = pd.read_excel(
+        df1 = pd.read_excel(
             self.filepath,
             skiprows=3,
             header=None,
             names=self.flatten_headers(tabname),
             sheet_name=tabname,
         ).dropna(subset=["SB U"])
-
+        df = df1[:96]  # note: this cuts off subsequent days, will need to be refactored
         df["datetime"] = None
 
         for idx, row in df.iterrows():
@@ -456,13 +458,14 @@ class TMC_File:
         else:
             print("Period must be AM or PM")
             return
+        index_maximum = df["total_hourly"].idxmax()
+        df2 = df.loc[df.index <= index_maximum].tail(4)
 
-        # idx = df[["total_hourly"]].idxmax()[0]
-        # print(idx)
-        # print(df.index.name)
+        fifteen_min_peaks = list(df2["total_15_min"])
+        hourlymax = df2["total_hourly"].max()
 
-        # df[df.index < idx].tail(3)
-        return df.head(60)
+        peak_hour_factor = hourlymax / (4 * max(fifteen_min_peaks))
+        return peak_hour_factor
 
     def peak_hour_text(self, period: str) -> str:
         """
