@@ -195,6 +195,7 @@ def write_summary_file(
     df_meta.insert(
         4, "am_network_peak", (f"{am_network_peak_hour} to {am_network_end}")
     )
+    df_meta = df_meta.drop(columns=["am_peak_hour_factor", "pm_peak_hour_factor"])
 
     # Write Summary and Detail tabs out to file
     writer = pd.ExcelWriter(output_xlsx_filepath, engine="xlsxwriter")
