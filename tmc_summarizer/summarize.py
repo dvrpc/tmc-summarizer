@@ -215,6 +215,7 @@ def write_summary_file(
     writer.sheets["Detail"].set_column(1, 15, 20)
 
     # Write raw data tabs
+    all_tmcs.sort(key=lambda x: int(x.location_id))
     for tmc in all_tmcs:
 
         kwargs = {"sheet_name": tmc.location_id, "startrow": 1, "startcol": 0}
