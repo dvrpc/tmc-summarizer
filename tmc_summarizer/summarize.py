@@ -175,7 +175,12 @@ def write_summary_file(
 
     # Merge each list of dataframes into its own combined dataframe
     df_meta = pd.concat(metadata)
+    df_meta["location_id"] = df_meta["location_id"].astype(int)
+    df_meta = df_meta.sort_values("location_id", ascending=True)
+
     df_detail = pd.concat(detailed_data)
+    df_detail["location_id"] = df_detail["location_id"].astype(int)
+    df_detail = df_detail.sort_values("location_id", ascending=True)
 
     # Add network peak hour in a nice format
     am_peak_hr_seconds = statistics.median(am_peak_hour_list)
