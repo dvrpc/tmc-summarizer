@@ -30,7 +30,6 @@ import geopandas as gpd
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Union
-
 from tmc_summarizer.data_model import TMC_File, geocode_tmc
 from tmc_summarizer.helpers import zip_files
 import statistics
@@ -73,6 +72,61 @@ def files_to_process(folder: Path) -> list:
     return files
 
 
+def get_network_peak_hour_df(df: pd.DataFrame, start, end):
+    """Creates a network peak hour summary df.
+    Should only be run AFTER all TMCs are created,
+    as TMCs are created by intersection peaks, then compiled to network"""
+    try:
+        df.index = df.index.time
+    except:
+        df.index = df.index
+    # Filter the total dataframe by the start/end times
+    df_peak = df.loc[(df.index >= start) & (df.index < end)]
+
+    # Delete the "total_hourly" column as it makes no sense to sum
+    del df_peak["total_hourly"]
+
+    return df_peak.sum().to_frame().T
+
+
+def get_df_peak(df: pd.DataFrame, start, end):
+    try:
+        df.index = df.index.time
+    except:
+        df.index = df.index
+    # Filter the total dataframe by the start/end times
+    df_peak = df.loc[(df.index >= start) & (df.index < end)]
+    return df_peak
+
+
+def df_network_peak_hour_heavy_pct(
+    start, end, df_total: pd.DataFrame, df_cars: pd.DataFrame
+):
+    cars_copy = df_cars.rename(
+        columns={
+            "EB Peds Xwalk": "EB Xwalk Xings",
+            "WB Peds Xwalk": "WB Xwalk Xings",
+            "NB Peds Xwalk": "NB Xwalk Xings",
+            "SB Peds Xwalk": "SB Xwalk Xings",
+        }
+    )
+    peak_total = get_network_peak_hour_df(df_total, start, end)
+    peak_cars = get_network_peak_hour_df(cars_copy, start, end)
+    return (1 - peak_cars / peak_total) * 100
+
+
+def network_peak_hour_factor(df_peak: pd.DataFrame):
+    """Returns the NETWORK peak hour factor for a given df_peak dataframe"""
+    index_maximum = df_peak["total_hourly"].idxmax()
+    df2 = df_peak.loc[df_peak.index <= index_maximum].tail(4)
+
+    fifteen_min_peaks = list(df2["total_15_min"])
+    hourlymax = df2["total_hourly"].max()
+
+    peak_hour_factor = hourlymax / (4 * max(fifteen_min_peaks))
+    return peak_hour_factor
+
+
 def write_summary_file(
     input_folder: Union[Path, str],
     output_folder: Union[Path, str] = None,
@@ -112,6 +166,10 @@ def write_summary_file(
     am_peak_hour_list = []
     pm_peak_hour_list = []
 
+    # created specifically to grab the actual datetime data for later use in the get_network_peak_hour function
+    am_peak_hour_times = []
+    pm_peak_hour_times = []
+
     input_folder = Path(input_folder)
 
     # Use the specified output folder
@@ -148,8 +206,10 @@ def write_summary_file(
             seconds = (time.hour * 60 + time.minute) * 60 + time.second
             if timeperiod == "am":
                 am_peak_hour_list.append(seconds)
+                am_peak_hour_times.append(time)
             elif timeperiod == "pm":
                 pm_peak_hour_list.append(seconds)
+                pm_peak_hour_times.append(time)
             else:
                 print("Not a valid time period")
 
@@ -193,6 +253,12 @@ def write_summary_file(
     pm_network_peak_hour = str(timedelta(seconds=pm_peak_hr_seconds))
     pm_network_end = str(timedelta(seconds=pm_end))
 
+    # Add network peak hour TIMES in a usable format for get_network_peak function. specifically returns times, not timedeltas or seconds
+    am_network_peak_start_time = am_peak_hour_times[len(am_peak_hour_times) // 2]
+    am_network_peak_end_time = am_network_peak_start_time + timedelta(hours=1)
+    pm_network_peak_start_time = pm_peak_hour_times[len(pm_peak_hour_times) // 2]
+    pm_network_peak_end_time = pm_network_peak_start_time + timedelta(hours=1)
+
     df_meta = df_meta.drop(columns=["am_peak_raw", "pm_peak_raw"])
     df_meta.insert(
         4, "pm_network_peak", (f"{pm_network_peak_hour} to {pm_network_end}")
@@ -201,6 +267,129 @@ def write_summary_file(
         4, "am_network_peak", (f"{am_network_peak_hour} to {am_network_end}")
     )
     df_meta = df_meta.drop(columns=["am_peak_hour_factor", "pm_peak_hour_factor"])
+
+    # Clear data from detail, fill in by looking up network peak hour and peak hour factor
+    df_meta = df_meta.set_index("location_id")
+    df_detail = df_detail.reset_index(drop=True)
+
+    tmc_dfs = {
+        "am_dict": {},
+        "pm_dict": {},
+    }  # Makes a dict of one-row dataframes that contains the volumes using the NETWORK peak hour instead of intersection peak hour
+    heavy_vehicle_dfs = {
+        "am_dict": {},
+        "pm_dict": {},
+    }  # Same as above but for percentages, not volumes
+    peak_hr_factors = {
+        "am_dict": {},
+        "pm_dict": {},
+    }  # Same as above but for peak hour factors
+
+    for tmc in all_tmcs:
+        tmc_id = tmc.location_id
+        tmc_id = int(tmc_id)
+
+        am_df = get_network_peak_hour_df(
+            tmc.df_total,
+            am_network_peak_start_time.time(),
+            am_network_peak_end_time.time(),
+        )
+        pm_df = get_network_peak_hour_df(
+            tmc.df_total,
+            pm_network_peak_start_time.time(),
+            pm_network_peak_end_time.time(),
+        )
+        tmc_dfs["am_dict"][tmc_id] = am_df  # nests am_df into tmc_dfs dict
+        tmc_dfs["pm_dict"][tmc_id] = pm_df
+
+        am_hv_pc = df_network_peak_hour_heavy_pct(
+            am_network_peak_start_time.time(),
+            am_network_peak_end_time.time(),
+            tmc.df_total,
+            tmc.df_cars,
+        )
+        pm_hv_pc = df_network_peak_hour_heavy_pct(
+            pm_network_peak_start_time.time(),
+            pm_network_peak_end_time.time(),
+            tmc.df_total,
+            tmc.df_cars,
+        )
+        heavy_vehicle_dfs["am_dict"][
+            tmc_id
+        ] = am_hv_pc  # nests heavy vehicle info into hv dict
+        heavy_vehicle_dfs["pm_dict"][tmc_id] = pm_hv_pc
+
+        am_network_peak_hour_factor = network_peak_hour_factor(
+            get_df_peak(
+                tmc.df_total,
+                am_network_peak_start_time.time(),
+                am_network_peak_end_time.time(),
+            )
+        )
+        pm_network_peak_hour_factor = network_peak_hour_factor(
+            get_df_peak(
+                tmc.df_total,
+                pm_network_peak_start_time.time(),
+                pm_network_peak_end_time.time(),
+            )
+        )
+        peak_hr_factors["am_dict"][
+            tmc_id
+        ] = am_network_peak_hour_factor  # nests am_df into peak_hr_factors dict
+        peak_hr_factors["pm_dict"][tmc_id] = pm_network_peak_hour_factor
+
+    df_detail.loc[df_detail["period"] == "am", "time"] = df_meta.at[
+        1, "am_network_peak"
+    ]
+    df_detail.loc[df_detail["period"] == "pm", "time"] = df_meta.at[
+        1, "pm_network_peak"
+    ]
+
+    def update_time_period_totals(key, time: str):
+        condition = (
+            (df_detail["period"] == f"{time}")
+            & (df_detail["dtype"] == "total")
+            & (df_detail["location_id"] == key)
+        )
+        df_detail.loc[condition, "EB U":"total_15_min"] = tmc_dfs[f"{time}_dict"][
+            key
+        ].values
+
+    def update_time_period_heavy_vehicles(key, time: str):
+        condition = (
+            (df_detail["period"] == f"{time}")
+            & (df_detail["dtype"] == "heavy_pct")
+            & (df_detail["location_id"] == key)
+        )
+        df_detail.loc[condition, "EB U":"total_15_min"] = heavy_vehicle_dfs[
+            f"{time}_dict"
+        ][key].values
+
+    def update_peak_hour_factors(key, time: str):
+        condition = (
+            (df_detail["period"] == f"{time}")
+            & (df_detail["location_id"] == key)
+            & (df_detail["dtype"] == "total")
+        )
+        condition2 = (
+            (df_detail["period"] == f"{time}")
+            & (df_detail["location_id"] == key)
+            & (df_detail["dtype"] == "heavy_pct")
+        )
+        df_detail.loc[condition, "peak_hour_factor"] = peak_hr_factors[f"{time}_dict"][
+            key
+        ]
+        df_detail.loc[condition2, "peak_hour_factor"] = 0
+
+    for key in tmc_dfs["am_dict"]:
+        update_time_period_totals(key, "am")
+        update_time_period_heavy_vehicles(key, "am")
+        update_peak_hour_factors(key, "am")
+
+    for key in tmc_dfs["pm_dict"]:
+        update_time_period_totals(key, "pm")
+        update_time_period_heavy_vehicles(key, "pm")
+        update_peak_hour_factors(key, "pm")
 
     # Write Summary and Detail tabs out to file
     writer = pd.ExcelWriter(output_xlsx_filepath, engine="xlsxwriter")
