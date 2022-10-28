@@ -1,11 +1,12 @@
 # tmc-summarizer
+
 Process raw TMC data into more functional formats.
 
 ## Live Demo
 
 Here: [http://167.172.146.34](http://167.172.146.34)
 
-The codebase for the demo can be found at [``dvrpc\tmc-app``](https://github.com/dvrpc/tmc-app)
+The codebase for the demo can be found at [`dvrpc\tmc-app`](https://github.com/dvrpc/tmc-app)
 
 ![image info](https://github.com/dvrpc/tmc-app/blob/master/static/assets/images/app_screenshot.png)
 
@@ -36,10 +37,11 @@ In all cases, you'll need the proper python environment activated.
 
 ```bash
 (base) $ conda activate tmc_summarizer
-(tmc_summarizer) $ 
+(tmc_summarizer) $
 ```
 
 ### Python
+
 ```python
 >>> from tmc_summarizer import write_summary_file
 >>> write_summary_file("/my/raw/data/folder", "/my/output/folder")
@@ -47,21 +49,22 @@ In all cases, you'll need the proper python environment activated.
 
 ### Command Line Interface
 
-Use the ``TMC summarize`` command to kick off the script. You need to specify a path where the data can be found.
+Use the `tmc summarize` command to kick off the script. You need to specify a path where the data can be found.
 
 ```bash
-(tmc_summarizer) $ TMC summarize my/data/
+(tmc_summarizer) $ tmc summarize my/data/
 ```
 
 ### Graphical User Interface
 
-Use the ``TMC gui`` command to visually select your data folder. 
+Use the `tmc gui` command to visually select your data folder.
 
 ```bash
-(tmc_summarizer) $ TMC gui
+(tmc_summarizer) $ tmc gui
 ```
 
 ## TODO
+
 :white_check_mark: match functionality of prototype
 
 :white_check_mark: add CLI hook
@@ -75,4 +78,5 @@ Use the ``TMC gui`` command to visually select your data folder.
 :black_square_button: test on Windows & Linux
 
 ## Questions:
-``Light Vehicles`` tab has ``Peds in Crosswalk``, while the ``Heavy Vehicles`` tab has ``Bikes in Crosswalk``. Is this intentional, or mislabeled data?
+
+`Light Vehicles` tab has `Peds in Crosswalk`, while the `Heavy Vehicles` tab has `Bikes in Crosswalk`. Is this intentional, or mislabeled data?
