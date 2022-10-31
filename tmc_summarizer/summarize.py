@@ -117,12 +117,8 @@ def df_network_peak_hour_heavy_pct(
 
 def network_peak_hour_factor(df_peak: pd.DataFrame):
     """Returns the NETWORK peak hour factor for a given df_peak dataframe"""
-    index_maximum = df_peak["total_hourly"].idxmax()
-    df2 = df_peak.loc[df_peak.index <= index_maximum].tail(4)
-
-    fifteen_min_peaks = list(df2["total_15_min"])
-    hourlymax = df2["total_hourly"].max()
-
+    fifteen_min_peaks = list(df_peak["total_15_min"])
+    hourlymax = df_peak["total_hourly"].iat[-1]
     peak_hour_factor = hourlymax / (4 * max(fifteen_min_peaks))
     return peak_hour_factor
 
