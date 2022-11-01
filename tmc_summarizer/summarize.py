@@ -117,12 +117,8 @@ def df_network_peak_hour_heavy_pct(
 
 def network_peak_hour_factor(df_peak: pd.DataFrame):
     """Returns the NETWORK peak hour factor for a given df_peak dataframe"""
-    index_maximum = df_peak["total_hourly"].idxmax()
-    df2 = df_peak.loc[df_peak.index <= index_maximum].tail(4)
-
-    fifteen_min_peaks = list(df2["total_15_min"])
-    hourlymax = df2["total_hourly"].max()
-
+    fifteen_min_peaks = list(df_peak["total_15_min"])
+    hourlymax = df_peak["total_hourly"].iat[-1]
     peak_hour_factor = hourlymax / (4 * max(fifteen_min_peaks))
     return peak_hour_factor
 
@@ -284,6 +280,14 @@ def write_summary_file(
         "am_dict": {},
         "pm_dict": {},
     }  # Same as above but for peak hour factors
+    car_dfs = {
+        "am_dict": {},
+        "pm_dict": {},
+    }  # Same as above but for peds in xwalk (which lives in cars tab)
+    heavy_vehicle_for_bikes_dfs = {
+        "am_dict": {},
+        "pm_dict": {},
+    }  # Same as above but for bikes in xwalk (which lives in heavy vehicles tab)
 
     for tmc in all_tmcs:
         tmc_id = tmc.location_id
@@ -299,6 +303,30 @@ def write_summary_file(
             pm_network_peak_start_time.time(),
             pm_network_peak_end_time.time(),
         )
+
+        am_cars_df = get_network_peak_hour_df(
+            tmc.df_cars,
+            am_network_peak_start_time.time(),
+            am_network_peak_end_time.time(),
+        )
+
+        pm_cars_df = get_network_peak_hour_df(
+            tmc.df_cars,
+            pm_network_peak_start_time.time(),
+            pm_network_peak_end_time.time(),
+        )
+        am_heavy_df = get_network_peak_hour_df(
+            tmc.df_heavy,
+            am_network_peak_start_time.time(),
+            am_network_peak_end_time.time(),
+        )
+
+        pm_heavy_df = get_network_peak_hour_df(
+            tmc.df_heavy,
+            pm_network_peak_start_time.time(),
+            pm_network_peak_end_time.time(),
+        )
+
         tmc_dfs["am_dict"][tmc_id] = am_df  # nests am_df into tmc_dfs dict
         tmc_dfs["pm_dict"][tmc_id] = pm_df
 
@@ -316,7 +344,7 @@ def write_summary_file(
         )
         heavy_vehicle_dfs["am_dict"][
             tmc_id
-        ] = am_hv_pc  # nests heavy vehicle info into hv dict
+        ] = am_hv_pc  # nests heavy vehicle percentages into hv dict
         heavy_vehicle_dfs["pm_dict"][tmc_id] = pm_hv_pc
 
         am_network_peak_hour_factor = network_peak_hour_factor(
@@ -333,10 +361,16 @@ def write_summary_file(
                 pm_network_peak_end_time.time(),
             )
         )
-        peak_hr_factors["am_dict"][
-            tmc_id
-        ] = am_network_peak_hour_factor  # nests am_df into peak_hr_factors dict
+
+        # nests dfs into peak_hr_factors dict
+        peak_hr_factors["am_dict"][tmc_id] = am_network_peak_hour_factor
         peak_hr_factors["pm_dict"][tmc_id] = pm_network_peak_hour_factor
+
+        # drop car and heavy vehicle one line dfs into dicts
+        car_dfs["am_dict"][tmc_id] = am_cars_df
+        car_dfs["pm_dict"][tmc_id] = pm_cars_df
+        heavy_vehicle_for_bikes_dfs["am_dict"][tmc_id] = am_heavy_df
+        heavy_vehicle_for_bikes_dfs["pm_dict"][tmc_id] = pm_heavy_df
 
     df_detail.loc[df_detail["period"] == "am", "time"] = df_meta.at[
         1, "am_network_peak"
@@ -381,15 +415,101 @@ def write_summary_file(
         ]
         df_detail.loc[condition2, "peak_hour_factor"] = 0
 
+    def update_bike_ped_info(key, time: str):
+        """grabs correct bike/ped info from the cars and heavy vehicles sheets, respectively"""
+        condition = (
+            (df_detail["period"] == f"{time}")
+            & (df_detail["location_id"] == key)
+            & (df_detail["dtype"] == "total")
+        )
+        condition2 = (
+            (df_detail["period"] == f"{time}")
+            & (df_detail["location_id"] == key)
+            & (df_detail["dtype"] == "heavy_pct")
+        )
+        directions = ["EB", "WB", "NB", "SB"]
+        for direction in directions:
+            df_detail.loc[
+                condition, f"{direction} Bikes Xwalk"
+            ] = heavy_vehicle_for_bikes_dfs[f"{time}_dict"][key][
+                f"{direction} Bikes Xwalk"
+            ][
+                0
+            ]
+            df_detail.loc[condition2, f"{direction} Bikes Xwalk"] = 0
+
+        for direction in directions:
+            df_detail.loc[condition, f"{direction} Peds Xwalk"] = car_dfs[
+                f"{time}_dict"
+            ][key][f"{direction} Peds Xwalk"][0]
+            df_detail.loc[condition2, f"{direction} Peds Xwalk"] = 0
+
     for key in tmc_dfs["am_dict"]:
         update_time_period_totals(key, "am")
         update_time_period_heavy_vehicles(key, "am")
         update_peak_hour_factors(key, "am")
+        update_bike_ped_info(key, "am")
 
     for key in tmc_dfs["pm_dict"]:
         update_time_period_totals(key, "pm")
         update_time_period_heavy_vehicles(key, "pm")
         update_peak_hour_factors(key, "pm")
+        update_bike_ped_info(key, "pm")
+
+    df_detail = df_detail.rename(
+        columns={
+            "EB Xwalk Xings": "EB Bikes Xwalk",
+            "WB Xwalk Xings": "WB Bikes Xwalk",
+            "NB Xwalk Xings": "NB Bikes Xwalk",
+            "SB Xwalk Xings": "SB Bikes Xwalk",
+        },
+        errors="raise",
+    )
+    reordered_cols = [
+        "location_name",
+        "location_id",
+        "dtype",
+        "period",
+        "time",
+        "peak_hour_factor",
+        "EB U",
+        "EB Left",
+        "EB Thru",
+        "EB Right",
+        "EB Peds Xwalk",
+        "EB Bikes Xwalk",
+        "WB U",
+        "WB Left",
+        "WB Thru",
+        "WB Right",
+        "WB Peds Xwalk",
+        "WB Bikes Xwalk",
+        "NB U",
+        "NB Left",
+        "NB Thru",
+        "NB Right",
+        "NB Peds Xwalk",
+        "NB Bikes Xwalk",
+        "SB U",
+        "SB Left",
+        "SB Thru",
+        "SB Right",
+        "SB Peds Xwalk",
+        "SB Bikes Xwalk",
+        "total_15_min",
+    ]
+    # have to do this after reorder/renames
+    for key in tmc_dfs["am_dict"]:
+        update_bike_ped_info(key, "am")
+
+    for key in tmc_dfs["pm_dict"]:
+        update_bike_ped_info(key, "pm")
+
+    df_detail = df_detail[reordered_cols]
+    df_detail = df_detail.rename(columns={"total_15_min": "total_60_min"})
+
+    # removes duplicate {direction} bike columns (can't figure out where they came from, but they're the exact same)
+    df_detail = df_detail.loc[:, ~df_detail.columns.duplicated()].copy()
 
     # Write Summary and Detail tabs out to file
     writer = pd.ExcelWriter(output_xlsx_filepath, engine="xlsxwriter")
