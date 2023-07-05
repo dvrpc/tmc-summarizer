@@ -178,7 +178,8 @@ def write_summary_file(
     now_txt_1 = start_time.strftime("%Y-%m-%d %H-%M-%S")
     now_txt_2 = start_time.strftime("%Y_%m_%d_%H_%M_%S")
 
-    output_xlsx_filepath = output_folder / ("TMC Summary " + now_txt_1 + ".xlsx")
+    output_xlsx_filepath = output_folder / \
+        ("TMC Summary " + now_txt_1 + ".xlsx")
     output_geojson_filepath = output_folder / (
         "tmc_locations_" + now_txt_2 + ".geojson"
     )
@@ -250,9 +251,11 @@ def write_summary_file(
     pm_network_end = str(timedelta(seconds=pm_end))
 
     # Add network peak hour TIMES in a usable format for get_network_peak function. specifically returns times, not timedeltas or seconds
-    am_network_peak_start_time = am_peak_hour_times[len(am_peak_hour_times) // 2]
+    am_network_peak_start_time = am_peak_hour_times[len(
+        am_peak_hour_times) // 2]
     am_network_peak_end_time = am_network_peak_start_time + timedelta(hours=1)
-    pm_network_peak_start_time = pm_peak_hour_times[len(pm_peak_hour_times) // 2]
+    pm_network_peak_start_time = pm_peak_hour_times[len(
+        pm_peak_hour_times) // 2]
     pm_network_peak_end_time = pm_network_peak_start_time + timedelta(hours=1)
 
     df_meta = df_meta.drop(columns=["am_peak_raw", "pm_peak_raw"])
@@ -262,7 +265,8 @@ def write_summary_file(
     df_meta.insert(
         4, "am_network_peak", (f"{am_network_peak_hour} to {am_network_end}")
     )
-    df_meta = df_meta.drop(columns=["am_peak_hour_factor", "pm_peak_hour_factor"])
+    df_meta = df_meta.drop(
+        columns=["am_peak_hour_factor", "pm_peak_hour_factor"])
 
     # Clear data from detail, fill in by looking up network peak hour and peak hour factor
     df_meta = df_meta.set_index("location_id")
@@ -545,10 +549,11 @@ def write_summary_file(
         kwargs["startcol"] += 24
 
         tmc.df_pct_heavy.to_excel(writer, **kwargs)
-        worksheet.write(0, kwargs["startcol"], "PERCENT HEAVY Vehicles", header_format)
+        worksheet.write(0, kwargs["startcol"],
+                        "PERCENT HEAVY Vehicles", header_format)
         worksheet.set_column(kwargs["startcol"], kwargs["startcol"], 21)
 
-    writer.save()
+    writer.close()
     print(f"\n-> Wrote TMC summary to {output_xlsx_filepath}")
 
     # files_to_zip = [output_xlsx_filepath]
@@ -587,7 +592,8 @@ def write_summary_file(
 if __name__ == "__main__":
 
     # local filepaths
-    project_root = Path("/Volumes/SanDisk2TB/code/turning-movement-count-summarizer")
+    project_root = Path(
+        "/Volumes/SanDisk2TB/code/turning-movement-count-summarizer")
     data_folder = project_root / "data" / "cleaned"
     output_folder = project_root / "data" / "outputs_aaron"
 
