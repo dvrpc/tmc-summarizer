@@ -53,7 +53,6 @@ def files_to_process(folder: Path) -> list:
 
     # Remove any files that don't have proper naming conventions
     for f in files:
-
         # Make sure there is at least 1 underscore
         if "_" not in str(f.name):
             print(f"No underscores, skipping {f.name}")
@@ -178,8 +177,7 @@ def write_summary_file(
     now_txt_1 = start_time.strftime("%Y-%m-%d %H-%M-%S")
     now_txt_2 = start_time.strftime("%Y_%m_%d_%H_%M_%S")
 
-    output_xlsx_filepath = output_folder / \
-        ("TMC Summary " + now_txt_1 + ".xlsx")
+    output_xlsx_filepath = output_folder / ("TMC Summary " + now_txt_1 + ".xlsx")
     output_geojson_filepath = output_folder / (
         "tmc_locations_" + now_txt_2 + ".geojson"
     )
@@ -240,23 +238,37 @@ def write_summary_file(
     df_detail = df_detail.sort_values("location_id", ascending=True)
 
     # Add network peak hour in a nice format
-    am_peak_hr_seconds = statistics.median(am_peak_hour_list)
-    am_end = am_peak_hr_seconds + 3600
-    pm_peak_hr_seconds = statistics.median(pm_peak_hour_list)
-    pm_end = pm_peak_hr_seconds + 3600
-
-    am_network_peak_hour = str(timedelta(seconds=am_peak_hr_seconds))
-    am_network_end = str(timedelta(seconds=am_end))
-    pm_network_peak_hour = str(timedelta(seconds=pm_peak_hr_seconds))
-    pm_network_end = str(timedelta(seconds=pm_end))
-
-    # Add network peak hour TIMES in a usable format for get_network_peak function. specifically returns times, not timedeltas or seconds
-    am_network_peak_start_time = am_peak_hour_times[len(
-        am_peak_hour_times) // 2]
-    am_network_peak_end_time = am_network_peak_start_time + timedelta(hours=1)
-    pm_network_peak_start_time = pm_peak_hour_times[len(
-        pm_peak_hour_times) // 2]
-    pm_network_peak_end_time = pm_network_peak_start_time + timedelta(hours=1)
+    for peak_hr_list in [am_peak_hour_list, pm_peak_hour_list]:
+        median = statistics.median(peak_hr_list)
+        rounded_median = int(median / 900) * 900
+        if median % 900 >= 450:
+            rounded_median += 900
+        else:
+            pass
+        if peak_hr_list == am_peak_hour_list:
+            am_peak_hr_seconds = rounded_median  # seconds
+            am_end = am_peak_hr_seconds + 3600  # seconds
+            am_network_peak_hour = str(
+                timedelta(seconds=am_peak_hr_seconds)
+            )  # time delta
+            am_network_end = str(timedelta(seconds=am_end))  # time delta
+            am_network_peak_start_time = am_peak_hour_times[
+                len(am_peak_hour_times) // 2
+            ]  # time (actual clockface time)
+            am_network_peak_end_time = am_network_peak_start_time + timedelta(
+                hours=1
+            )  # time (actual clockface time)
+        elif peak_hr_list == pm_peak_hour_list:
+            pm_peak_hr_seconds = rounded_median
+            pm_end = pm_peak_hr_seconds + 3600
+            pm_network_peak_hour = str(timedelta(seconds=pm_peak_hr_seconds))
+            pm_network_end = str(timedelta(seconds=pm_end))
+            pm_network_peak_start_time = pm_peak_hour_times[
+                len(pm_peak_hour_times) // 2
+            ]
+            pm_network_peak_end_time = pm_network_peak_start_time + timedelta(hours=1)
+        else:
+            print("the list in this for loop only accepts AM and PM peaks, for now.")
 
     df_meta = df_meta.drop(columns=["am_peak_raw", "pm_peak_raw"])
     df_meta.insert(
@@ -265,8 +277,7 @@ def write_summary_file(
     df_meta.insert(
         4, "am_network_peak", (f"{am_network_peak_hour} to {am_network_end}")
     )
-    df_meta = df_meta.drop(
-        columns=["am_peak_hour_factor", "pm_peak_hour_factor"])
+    df_meta = df_meta.drop(columns=["am_peak_hour_factor", "pm_peak_hour_factor"])
 
     # Clear data from detail, fill in by looking up network peak hour and peak hour factor
     df_meta = df_meta.set_index("location_id")
@@ -530,7 +541,6 @@ def write_summary_file(
     # Write raw data tabs
     all_tmcs.sort(key=lambda x: int(x.location_id))
     for tmc in all_tmcs:
-
         kwargs = {"sheet_name": tmc.location_id, "startrow": 1, "startcol": 0}
 
         tmc.df_total.to_excel(writer, **kwargs)
@@ -549,8 +559,7 @@ def write_summary_file(
         kwargs["startcol"] += 24
 
         tmc.df_pct_heavy.to_excel(writer, **kwargs)
-        worksheet.write(0, kwargs["startcol"],
-                        "PERCENT HEAVY Vehicles", header_format)
+        worksheet.write(0, kwargs["startcol"], "PERCENT HEAVY Vehicles", header_format)
         worksheet.set_column(kwargs["startcol"], kwargs["startcol"], 21)
 
     writer.close()
@@ -562,7 +571,6 @@ def write_summary_file(
     # ---------------------------------------------------------------
 
     if geocode_helper:
-
         # Geocode the location
         for tmc in all_tmcs:
             lat, lon, _ = geocode_tmc(tmc, geocode_helper)
@@ -590,10 +598,8 @@ def write_summary_file(
 
 
 if __name__ == "__main__":
-
     # local filepaths
-    project_root = Path(
-        "/Volumes/SanDisk2TB/code/turning-movement-count-summarizer")
+    project_root = Path("/Volumes/SanDisk2TB/code/turning-movement-count-summarizer")
     data_folder = project_root / "data" / "cleaned"
     output_folder = project_root / "data" / "outputs_aaron"
 
