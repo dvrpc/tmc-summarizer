@@ -238,42 +238,46 @@ def write_summary_file(
     df_detail["location_id"] = df_detail["location_id"].astype(int)
     df_detail = df_detail.sort_values("location_id", ascending=True)
 
-    # Add network peak hour in a nice format
-    for peak_hr_list in [am_peak_hour_list, pm_peak_hour_list]:
-        median = statistics.median(peak_hr_list)
+    def network_peak_format(peak_list: list):
+        """Returns peak hour information for different time periods"""
+        median = statistics.median(peak_list)
         rounded_median = int(median / 900) * 900
         if median % 900 >= 450:
             rounded_median += 900
         else:
             pass
-        if peak_hr_list == am_peak_hour_list:
-            am_peak_hr_seconds = rounded_median  # seconds
-            am_end = am_peak_hr_seconds + 3600  # seconds
-            am_network_peak_hour = str(
-                timedelta(seconds=am_peak_hr_seconds)
-            )  # time delta
-            hour = int(am_network_peak_hour.split(':')[0])
-            minute = int(am_network_peak_hour.split(':')[1])
-            am_network_end = str(timedelta(seconds=am_end))  # time delta
-            # arbitrary date, doesn't matter, but times do
-            peak_time = datetime(2023, 1, 1, hour, minute)
-            # time(actual clockface time)
-            am_network_peak_start_time = peak_time
-            am_network_peak_end_time = am_network_peak_start_time + timedelta(
-                hours=1
-            )  # time (actual clockface time)
-        elif peak_hr_list == pm_peak_hour_list:
-            pm_peak_hr_seconds = rounded_median
-            pm_end = pm_peak_hr_seconds + 3600
-            pm_network_peak_hour = str(timedelta(seconds=pm_peak_hr_seconds))
-            pm_network_end = str(timedelta(seconds=pm_end))
-            pm_network_peak_start_time = pm_peak_hour_times[
-                len(pm_peak_hour_times) // 2
-            ]
-            pm_network_peak_end_time = pm_network_peak_start_time + \
-                timedelta(hours=1)
-        else:
-            print("the list in this for loop only accepts AM and PM peaks, for now.")
+
+        peak_hr_seconds = rounded_median
+        end = peak_hr_seconds + 3600  # seconds
+        network_peak_hour = str(
+            timedelta(seconds=peak_hr_seconds)
+        )  # time delta
+        hour = int(network_peak_hour.split(':')[0])
+        minute = int(network_peak_hour.split(':')[1])
+        network_end = str(timedelta(seconds=end))  # time delta
+        # arbitrary date, doesn't matter, but times do
+        peak_time = datetime(2023, 1, 1, hour, minute)
+        # time(actual clockface time)
+        network_peak_start_time = peak_time
+        network_peak_end_time = network_peak_start_time + timedelta(
+            hours=1
+        )  # time (actual clockface time)
+        return [network_peak_hour,
+                network_end,
+                network_peak_start_time,
+                network_peak_end_time]
+
+    am_network = network_peak_format(am_peak_hour_list)
+    am_network_peak_hour = am_network[0]
+    am_network_end = am_network[1]
+    am_network_peak_start_time = am_network[2]
+    am_network_peak_end_time = am_network[3]
+
+    pm_network = network_peak_format(pm_peak_hour_list)
+    pm_network_peak_hour = pm_network[0]
+    pm_network_end = pm_network[1]
+    pm_network_peak_start_time = pm_network[2]
+    pm_network_peak_end_time = pm_network[3]
 
     df_meta = df_meta.drop(columns=["am_peak_raw", "pm_peak_raw"])
     df_meta.insert(
