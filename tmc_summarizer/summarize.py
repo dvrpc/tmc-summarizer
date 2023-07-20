@@ -75,6 +75,7 @@ def get_network_peak_hour_df(df: pd.DataFrame, start, end):
     """Creates a network peak hour summary df.
     Should only be run AFTER all TMCs are created,
     as TMCs are created by intersection peaks, then compiled to network"""
+    print(start, end)
     try:
         df.index = df.index.time
     except:
@@ -84,7 +85,6 @@ def get_network_peak_hour_df(df: pd.DataFrame, start, end):
 
     # Delete the "total_hourly" column as it makes no sense to sum
     del df_peak["total_hourly"]
-
     return df_peak.sum().to_frame().T
 
 
@@ -177,8 +177,7 @@ def write_summary_file(
     now_txt_1 = start_time.strftime("%Y-%m-%d %H-%M-%S")
     now_txt_2 = start_time.strftime("%Y_%m_%d_%H_%M_%S")
 
-    output_xlsx_filepath = output_folder / \
-        ("TMC Summary " + now_txt_1 + ".xlsx")
+    output_xlsx_filepath = output_folder / ("TMC Summary " + now_txt_1 + ".xlsx")
     output_geojson_filepath = output_folder / (
         "tmc_locations_" + now_txt_2 + ".geojson"
     )
@@ -249,11 +248,9 @@ def write_summary_file(
 
         peak_hr_seconds = rounded_median
         end = peak_hr_seconds + 3600  # seconds
-        network_peak_hour = str(
-            timedelta(seconds=peak_hr_seconds)
-        )  # time delta
-        hour = int(network_peak_hour.split(':')[0])
-        minute = int(network_peak_hour.split(':')[1])
+        network_peak_hour = str(timedelta(seconds=peak_hr_seconds))  # time delta
+        hour = int(network_peak_hour.split(":")[0])
+        minute = int(network_peak_hour.split(":")[1])
         network_end = str(timedelta(seconds=end))  # time delta
         # arbitrary date, doesn't matter, but times do
         peak_time = datetime(2023, 1, 1, hour, minute)
@@ -262,10 +259,12 @@ def write_summary_file(
         network_peak_end_time = network_peak_start_time + timedelta(
             hours=1
         )  # time (actual clockface time)
-        return [network_peak_hour,
-                network_end,
-                network_peak_start_time,
-                network_peak_end_time]
+        return [
+            network_peak_hour,
+            network_end,
+            network_peak_start_time,
+            network_peak_end_time,
+        ]
 
     am_network = network_peak_format(am_peak_hour_list)
     am_network_peak_hour = am_network[0]
@@ -286,8 +285,7 @@ def write_summary_file(
     df_meta.insert(
         4, "am_network_peak", (f"{am_network_peak_hour} to {am_network_end}")
     )
-    df_meta = df_meta.drop(
-        columns=["am_peak_hour_factor", "pm_peak_hour_factor"])
+    df_meta = df_meta.drop(columns=["am_peak_hour_factor", "pm_peak_hour_factor"])
 
     # Clear data from detail, fill in by looking up network peak hour and peak hour factor
     df_meta = df_meta.set_index("location_id")
@@ -569,8 +567,7 @@ def write_summary_file(
         kwargs["startcol"] += 24
 
         tmc.df_pct_heavy.to_excel(writer, **kwargs)
-        worksheet.write(0, kwargs["startcol"],
-                        "PERCENT HEAVY Vehicles", header_format)
+        worksheet.write(0, kwargs["startcol"], "PERCENT HEAVY Vehicles", header_format)
         worksheet.set_column(kwargs["startcol"], kwargs["startcol"], 21)
 
     writer.close()
@@ -610,8 +607,7 @@ def write_summary_file(
 
 if __name__ == "__main__":
     # local filepaths
-    project_root = Path(
-        "/Volumes/SanDisk2TB/code/turning-movement-count-summarizer")
+    project_root = Path("/Volumes/SanDisk2TB/code/turning-movement-count-summarizer")
     data_folder = project_root / "data" / "cleaned"
     output_folder = project_root / "data" / "outputs_aaron"
 
