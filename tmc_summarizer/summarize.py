@@ -118,7 +118,17 @@ def network_peak_hour_factor(df_peak: pd.DataFrame):
     """Returns the NETWORK peak hour factor for a given df_peak dataframe"""
     fifteen_min_peaks = list(df_peak["total_15_min"])
     hourlymax = df_peak["total_hourly"].iat[-1]
-    peak_hour_factor = hourlymax / (4 * max(fifteen_min_peaks))
+    fifteen_min_peak_max = max(fifteen_min_peaks)
+    
+
+    
+    bike_ped_total = sum(list(df_peak["EB Xwalk Xings"])) + sum(list(df_peak["WB Xwalk Xings"])) + sum(list(df_peak["NB Xwalk Xings"])) + sum(list(df_peak["SB Xwalk Xings"]))
+
+    fifteen_min_peak_max_row = df_peak.iloc[fifteen_min_peaks.index(fifteen_min_peak_max)]
+    fifteen_min_peak_max_bike_ped_total = fifteen_min_peak_max_row["EB Xwalk Xings"] + fifteen_min_peak_max_row["WB Xwalk Xings"] + fifteen_min_peak_max_row["NB Xwalk Xings"] + fifteen_min_peak_max_row["SB Xwalk Xings"]
+
+
+    peak_hour_factor = (hourlymax - bike_ped_total) / (4 * (max(fifteen_min_peaks) - fifteen_min_peak_max_bike_ped_total))
     return peak_hour_factor
 
 
@@ -533,7 +543,7 @@ def write_summary_file(
 
     # removes duplicate {direction} bike columns (can't figure out where they came from, but they're the exact same)
     df_detail = df_detail.loc[:, ~df_detail.columns.duplicated()].copy()
-
+    df_detail = df_detail.sort_values(by=['location_id', 'period', 'dtype'], ascending=[True, True, False], ignore_index=True)
     # Write Summary and Detail tabs out to file
     writer = pd.ExcelWriter(output_xlsx_filepath, engine="xlsxwriter")
 
