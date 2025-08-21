@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 setup(
     name='tmc_summarizer',
     packages=find_packages(),
-    version='1.1.2',
+    version='1.1.3',
     description='Process raw TMC data into more functional formats.',
     author='Aaron Fraint, AICP; Mark Morley, AICP',
     entry_points="""
