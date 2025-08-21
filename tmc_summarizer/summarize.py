@@ -129,7 +129,7 @@ def network_peak_hour_factor(df_peak: pd.DataFrame):
 
 
     peak_hour_factor = (hourlymax - bike_ped_total) / (4 * (max(fifteen_min_peaks) - fifteen_min_peak_max_bike_ped_total))
-    return peak_hour_factor
+    return round(peak_hour_factor, 2)
 
 
 def write_summary_file(
