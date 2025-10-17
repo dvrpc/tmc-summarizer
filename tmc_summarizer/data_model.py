@@ -443,7 +443,7 @@ class TMC_File:
             df = self.df_total[(self.df_total.index < noon)]
         elif period == "MIDDAY":
             print(self.df_total.index)
-            df = self.df_total[(self.df_total.index >= ten_am) & (self.df_total.index <= three_pm)]
+            df = self.df_total[(self.df_total.index >= ten_am) & (self.df_total.index < three_pm)]
         elif period == "PM":
             df = self.df_total[(self.df_total.index >= noon)]
         else:
@@ -468,7 +468,7 @@ class TMC_File:
         if period == "AM":
             df = self.df_total[self.df_total.index < noon]
         elif period == "Midday":
-            df = self.df_total[(self.df_total.index >= ten_am) & (self.df_total.index <= three_pm)]
+            df = self.df_total[(self.df_total.index >= ten_am) & (self.df_total.index < three_pm)]
         elif period == "PM":
             df = self.df_total[self.df_total.index >= noon]
         else:
