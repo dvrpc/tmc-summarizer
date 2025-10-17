@@ -249,10 +249,13 @@ class TMC_File:
             "date": self.date.strftime("%Y-%m-%d"),
             "time": f"{self.start_time} to {self.end_time}",
             "am_peak": self.peak_hour_text("AM"),
+            "midday_peak": self.peak_hour_text("Midday"),
             "pm_peak": self.peak_hour_text("PM"),
             "am_peak_raw": self.get_peak_hour("AM"),
+            "midday_peak_raw": self.get_peak_hour("Midday"),
             "pm_peak_raw": self.get_peak_hour("PM"),
             "am_peak_hour_factor": self.peak_hour_factor("AM"),
+            "midday_peak_hour_factor": self.peak_hour_factor("Midday"),
             "pm_peak_hour_factor": self.peak_hour_factor("PM"),
         }
 
@@ -272,6 +275,8 @@ class TMC_File:
         self.peak_data = {
             "am_total": self.df_peak_hour(self.df_total, "AM"),
             "am_heavy_pct": self.df_peak_hour_heavy_pct("AM"),
+            "midday_total": self.df_peak_hour(self.df_total, "Midday"),
+            "midday_heavy_pct": self.df_peak_hour_heavy_pct("Midday"),
             "pm_total": self.df_peak_hour(self.df_total, "PM"),
             "pm_heavy_pct": self.df_peak_hour_heavy_pct("PM"),
         }
@@ -427,17 +432,24 @@ class TMC_File:
         :rtype: tuple with datetime
         """
 
+
         period = period.upper()
 
         noon = datetime.combine(self.date, time(hour=12))
+        ten_am = datetime.combine(self.date, time(hour=10))
+        three_pm = datetime.combine(self.date, time(hour=15))
 
         if period == "AM":
             df = self.df_total[(self.df_total.index < noon)]
+        elif period == "MIDDAY":
+            print(self.df_total.index)
+            df = self.df_total[(self.df_total.index >= ten_am) & (self.df_total.index <= three_pm)]
         elif period == "PM":
             df = self.df_total[(self.df_total.index >= noon)]
         else:
-            print("Period must be AM or PM")
+            print("Period must be AM or PM or midday")
             return
+            
 
         final_15_min = df[["total_hourly"]].idxmax()[0]
 
@@ -449,10 +461,14 @@ class TMC_File:
     def peak_hour_factor(self, period: str):
 
         noon = datetime.combine(self.date, time(hour=12))
+        ten_am = datetime.combine(self.date, time(hour=10))
+        three_pm = datetime.combine(self.date, time(hour=15))
         period = period.upper()
 
         if period == "AM":
             df = self.df_total[self.df_total.index < noon]
+        elif period == "Midday":
+            df = self.df_total[(self.df_total.index >= ten_am) & (self.df_total.index <= three_pm)]
         elif period == "PM":
             df = self.df_total[self.df_total.index >= noon]
         else:

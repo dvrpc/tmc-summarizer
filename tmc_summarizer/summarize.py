@@ -169,10 +169,12 @@ def write_summary_file(
 
     # these two lists exist to add the peak hours, in seconds, so they can be averaged for the network later
     am_peak_hour_list = []
+    midday_peak_hour_list = []
     pm_peak_hour_list = []
 
     # created specifically to grab the actual datetime data for later use in the get_network_peak_hour function
     am_peak_hour_times = []
+    midday_peak_hour_times = []
     pm_peak_hour_times = []
 
     input_folder = Path(input_folder)
@@ -205,13 +207,17 @@ def write_summary_file(
         # For each cut listed below, get single-row DF
         # -> (am_total, am_heavy_pct, pm_total, pm_heavy_pct)
 
-        for timeperiod in ["am", "pm"]:
+        for timeperiod in ["am", "midday", "pm"]:
+            print(tmc.df_meta)
             meta_data_peak = list(tmc.df_meta.loc[:, f"{timeperiod}_peak_raw"])
             time = meta_data_peak[0][0].to_pydatetime()
             seconds = (time.hour * 60 + time.minute) * 60 + time.second
             if timeperiod == "am":
                 am_peak_hour_list.append(seconds)
                 am_peak_hour_times.append(time)
+            elif timeperiod == "midday":
+                midday_peak_hour_list.append(seconds)
+                midday_peak_hour_times.append(time)
             elif timeperiod == "pm":
                 pm_peak_hour_list.append(seconds)
                 pm_peak_hour_times.append(time)
@@ -282,20 +288,29 @@ def write_summary_file(
     am_network_peak_start_time = am_network[2]
     am_network_peak_end_time = am_network[3]
 
+    midday_network = network_peak_format(midday_peak_hour_list)
+    midday_network_peak_hour = midday_network[0]
+    midday_network_end = midday_network[1]
+    midday_network_peak_start_time = midday_network[2]
+    midday_network_peak_end_time = midday_network[3]
+
     pm_network = network_peak_format(pm_peak_hour_list)
     pm_network_peak_hour = pm_network[0]
     pm_network_end = pm_network[1]
     pm_network_peak_start_time = pm_network[2]
     pm_network_peak_end_time = pm_network[3]
 
-    df_meta = df_meta.drop(columns=["am_peak_raw", "pm_peak_raw"])
+    df_meta = df_meta.drop(columns=["am_peak_raw", "midday_peak_raw", "pm_peak_raw"])
     df_meta.insert(
         4, "pm_network_peak", (f"{pm_network_peak_hour} to {pm_network_end}")
     )
     df_meta.insert(
+        4, "midday_network_peak", (f"{midday_network_peak_hour} to {midday_network_end}")
+    )
+    df_meta.insert(
         4, "am_network_peak", (f"{am_network_peak_hour} to {am_network_end}")
     )
-    df_meta = df_meta.drop(columns=["am_peak_hour_factor", "pm_peak_hour_factor"])
+    df_meta = df_meta.drop(columns=["am_peak_hour_factor", "midday_peak_hour_factor", "pm_peak_hour_factor"])
 
     # Clear data from detail, fill in by looking up network peak hour and peak hour factor
     df_meta = df_meta.set_index("location_id")
@@ -303,22 +318,27 @@ def write_summary_file(
 
     tmc_dfs = {
         "am_dict": {},
+        "midday_dict": {},
         "pm_dict": {},
     }  # Makes a dict of one-row dataframes that contains the volumes using the NETWORK peak hour instead of intersection peak hour
     heavy_vehicle_dfs = {
         "am_dict": {},
+        "midday_dict": {},
         "pm_dict": {},
     }  # Same as above but for percentages, not volumes
     peak_hr_factors = {
         "am_dict": {},
+        "midday_dict": {},
         "pm_dict": {},
     }  # Same as above but for peak hour factors
     car_dfs = {
         "am_dict": {},
+        "midday_dict": {},
         "pm_dict": {},
     }  # Same as above but for peds in xwalk (which lives in cars tab)
     heavy_vehicle_for_bikes_dfs = {
         "am_dict": {},
+        "midday_dict": {},
         "pm_dict": {},
     }  # Same as above but for bikes in xwalk (which lives in heavy vehicles tab)
 
@@ -331,6 +351,13 @@ def write_summary_file(
             am_network_peak_start_time.time(),
             am_network_peak_end_time.time(),
         )
+
+        midday_df = get_network_peak_hour_df(
+            tmc.df_total,
+            midday_network_peak_start_time.time(),
+            midday_network_peak_end_time.time(),
+        )
+
         pm_df = get_network_peak_hour_df(
             tmc.df_total,
             pm_network_peak_start_time.time(),
@@ -341,6 +368,12 @@ def write_summary_file(
             tmc.df_cars,
             am_network_peak_start_time.time(),
             am_network_peak_end_time.time(),
+        )
+
+        midday_cars_df = get_network_peak_hour_df(
+            tmc.df_cars,
+            midday_network_peak_start_time.time(),
+            midday_network_peak_end_time.time(),
         )
 
         pm_cars_df = get_network_peak_hour_df(
@@ -354,6 +387,12 @@ def write_summary_file(
             am_network_peak_end_time.time(),
         )
 
+        midday_heavy_df = get_network_peak_hour_df(
+            tmc.df_heavy,
+            midday_network_peak_start_time.time(),
+            midday_network_peak_end_time.time(),
+        )
+
         pm_heavy_df = get_network_peak_hour_df(
             tmc.df_heavy,
             pm_network_peak_start_time.time(),
@@ -361,6 +400,7 @@ def write_summary_file(
         )
 
         tmc_dfs["am_dict"][tmc_id] = am_df  # nests am_df into tmc_dfs dict
+        tmc_dfs["midday_dict"][tmc_id] = midday_df 
         tmc_dfs["pm_dict"][tmc_id] = pm_df
 
         am_hv_pc = df_network_peak_hour_heavy_pct(
@@ -369,6 +409,14 @@ def write_summary_file(
             tmc.df_total,
             tmc.df_cars,
         )
+
+        midday_hv_pc = df_network_peak_hour_heavy_pct(
+            midday_network_peak_start_time.time(),
+            midday_network_peak_end_time.time(),
+            tmc.df_total,
+            tmc.df_cars,
+        )
+
         pm_hv_pc = df_network_peak_hour_heavy_pct(
             pm_network_peak_start_time.time(),
             pm_network_peak_end_time.time(),
@@ -378,6 +426,7 @@ def write_summary_file(
         heavy_vehicle_dfs["am_dict"][
             tmc_id
         ] = am_hv_pc  # nests heavy vehicle percentages into hv dict
+        heavy_vehicle_dfs["midday_dict"][tmc_id] = midday_hv_pc
         heavy_vehicle_dfs["pm_dict"][tmc_id] = pm_hv_pc
 
         am_network_peak_hour_factor = network_peak_hour_factor(
@@ -385,6 +434,14 @@ def write_summary_file(
                 tmc.df_total,
                 am_network_peak_start_time.time(),
                 am_network_peak_end_time.time(),
+            )
+        )
+
+        midday_network_peak_hour_factor = network_peak_hour_factor(
+            get_df_peak(
+                tmc.df_total,
+                midday_network_peak_start_time.time(),
+                midday_network_peak_end_time.time(),
             )
         )
         pm_network_peak_hour_factor = network_peak_hour_factor(
@@ -397,16 +454,22 @@ def write_summary_file(
 
         # nests dfs into peak_hr_factors dict
         peak_hr_factors["am_dict"][tmc_id] = am_network_peak_hour_factor
+        peak_hr_factors["midday_dict"][tmc_id] = midday_network_peak_hour_factor
         peak_hr_factors["pm_dict"][tmc_id] = pm_network_peak_hour_factor
 
         # drop car and heavy vehicle one line dfs into dicts
         car_dfs["am_dict"][tmc_id] = am_cars_df
+        car_dfs["midday_dict"][tmc_id] = midday_cars_df
         car_dfs["pm_dict"][tmc_id] = pm_cars_df
         heavy_vehicle_for_bikes_dfs["am_dict"][tmc_id] = am_heavy_df
+        heavy_vehicle_for_bikes_dfs["midday_dict"][tmc_id] = midday_heavy_df
         heavy_vehicle_for_bikes_dfs["pm_dict"][tmc_id] = pm_heavy_df
 
     df_detail.loc[df_detail["period"] == "am", "time"] = df_meta.at[
         1, "am_network_peak"
+    ]
+    df_detail.loc[df_detail["period"] == "midday", "time"] = df_meta.at[
+        1, "midday_network_peak"
     ]
     df_detail.loc[df_detail["period"] == "pm", "time"] = df_meta.at[
         1, "pm_network_peak"
@@ -483,6 +546,12 @@ def write_summary_file(
         update_peak_hour_factors(key, "am")
         update_bike_ped_info(key, "am")
 
+    for key in tmc_dfs["midday_dict"]:
+        update_time_period_totals(key, "midday")
+        update_time_period_heavy_vehicles(key, "midday")
+        update_peak_hour_factors(key, "midday")
+        update_bike_ped_info(key, "midday")
+
     for key in tmc_dfs["pm_dict"]:
         update_time_period_totals(key, "pm")
         update_time_period_heavy_vehicles(key, "pm")
@@ -534,6 +603,9 @@ def write_summary_file(
     # have to do this after reorder/renames
     for key in tmc_dfs["am_dict"]:
         update_bike_ped_info(key, "am")
+
+    for key in tmc_dfs["midday_dict"]:
+        update_bike_ped_info(key, "midday")
 
     for key in tmc_dfs["pm_dict"]:
         update_bike_ped_info(key, "pm")
