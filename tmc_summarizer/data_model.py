@@ -53,6 +53,7 @@ Usage
 """
 import os
 import pandas as pd
+import numpy as np
 from pathlib import Path
 from typing import Union
 from datetime import datetime, time, timedelta
@@ -89,7 +90,8 @@ class TMC_File:
 
         self.filepath = Path(filepath)
         self.location_id = self.filepath.name.split("_")[0]
-
+        self.is_three_class = False
+        
         print("Reading", self.filepath.name)
 
         # Load the INFORMATION tab data on place names
@@ -228,10 +230,26 @@ class TMC_File:
 
         # Read the DATA tabs into dataframes
         # ----------------------------------
-        self.df_cars = self.read_data_tab("Cars")
-        self.df_cars = self.df_cars[self.car_cols]
-        self.df_heavy = self.read_data_tab("Heavy Vehicles")
-        self.df_heavy = self.df_heavy[self.heavy_cols]
+        
+        
+        try:
+            self.df_cars = self.read_data_tab("Cars")
+            self.df_cars = self.df_cars[self.car_cols]
+
+        except:
+            self.is_three_class = True
+            print('Failed to find Cars tab. Attempting reading tabs in 3 class format...')
+            
+        if(self.is_three_class):
+            self.df_cars = self.read_data_tab("Class 1 - Cars")
+            self.df_cars = self.df_cars[self.car_cols]
+            class_2 = self.read_data_tab("Class 2 - User Selected")
+            class_3 = self.read_data_tab("Class 3 - User Selected")
+            self.df_heavy = class_2.add(class_3)
+            self.df_heavy = self.df_heavy[self.heavy_cols]
+        else:
+            self.df_heavy = self.read_data_tab("Heavy Vehicles")
+            self.df_heavy = self.df_heavy[self.heavy_cols]
         # self.bikes = self.read_data_tab("Bicycles")
         self.df_total = self.read_data_tab("TOTAL")
         self.df_total = self.df_total[self.total_cols]
@@ -302,7 +320,10 @@ class TMC_File:
             try:
                 row.time = datetime.time(row.time)
             except:
-                row.time = row.time
+                try:
+                    row.time = datetime.strptime(row.time, "%H:%M").time()
+                except:
+                    row.time = row.time
             df.at[idx, "datetime"] = datetime.combine(self.date, row.time)
 
         del df["time"]
@@ -343,6 +364,8 @@ class TMC_File:
             "time": "time",
             "date": "date",
             # handle the expected typos!
+            "--": "Bikes Xwalk",
+            "peds": "Peds Xwalk",
             "bikes in croswalk": "Bikes Xwalk",
             "peds in croswalk": "Peds Xwalk",
             "crosswalk crossings": "Xwalk Xings",
@@ -363,6 +386,11 @@ class TMC_File:
 
             # Warn the user if the file has unexpected headers!
             # If it does, use the raw value instead of our nicely formatted one
+            
+            # Catch issue with 3 class date column
+            if not isinstance(level_2, str) and col == 0 and self.is_three_class:
+                level_2 = 'Date'
+                
             if level_2.lower() in replacements_level_2:
                 l2 = replacements_level_2[level_2.lower()]
             else:
@@ -436,14 +464,13 @@ class TMC_File:
         period = period.upper()
 
         noon = datetime.combine(self.date, time(hour=12))
-        ten_am = datetime.combine(self.date, time(hour=10))
+        ten_45 = datetime.combine(self.date, time(hour=10, minute=45)) # Accounts for hour subtraction for 10 - 3 midday
         three_pm = datetime.combine(self.date, time(hour=15))
 
         if period == "AM":
             df = self.df_total[(self.df_total.index < noon)]
         elif period == "MIDDAY":
-            print(self.df_total.index)
-            df = self.df_total[(self.df_total.index >= ten_am) & (self.df_total.index < three_pm)]
+            df = self.df_total[(self.df_total.index >= ten_45) & (self.df_total.index < three_pm)]
         elif period == "PM":
             df = self.df_total[(self.df_total.index >= noon)]
         else:
@@ -649,3 +676,5 @@ def geocode_tmc(tmc: TMC_File, geocode_helper: str):
     lon = result[0]["geometry"]["location"]["lng"]
 
     return (lat, lon, result)
+
+
