@@ -116,21 +116,12 @@ def df_network_peak_hour_heavy_pct(
 
 def network_peak_hour_factor(df_peak: pd.DataFrame):
     """Returns the NETWORK peak hour factor for a given df_peak dataframe"""
-    fifteen_min_peaks = list(df_peak["total_15_min"])
-    hourlymax = df_peak["total_hourly"].iat[-1]
+    df_peak["total_15_min_veh"] = df_peak["total_15_min"] - df_peak["EB Xwalk Xings"] - df_peak["NB Xwalk Xings"] - df_peak["SB Xwalk Xings"] - df_peak["WB Xwalk Xings"]
+    fifteen_min_peaks = list(df_peak["total_15_min_veh"])
+    hourlymax = sum(fifteen_min_peaks)
     fifteen_min_peak_max = max(fifteen_min_peaks)
-    
-
-    
-    bike_ped_total = sum(list(df_peak["EB Xwalk Xings"])) + sum(list(df_peak["WB Xwalk Xings"])) + sum(list(df_peak["NB Xwalk Xings"])) + sum(list(df_peak["SB Xwalk Xings"]))
-
-    fifteen_min_peak_max_row = df_peak.iloc[fifteen_min_peaks.index(fifteen_min_peak_max)]
-    fifteen_min_peak_max_bike_ped_total = fifteen_min_peak_max_row["EB Xwalk Xings"] + fifteen_min_peak_max_row["WB Xwalk Xings"] + fifteen_min_peak_max_row["NB Xwalk Xings"] + fifteen_min_peak_max_row["SB Xwalk Xings"]
-
-
-    peak_hour_factor = (hourlymax - bike_ped_total) / (4 * (max(fifteen_min_peaks) - fifteen_min_peak_max_bike_ped_total))
+    peak_hour_factor = (hourlymax) / (4 * fifteen_min_peak_max)
     return round(peak_hour_factor, 2)
-
 
 def write_summary_file(
     input_folder: Union[Path, str],
@@ -695,3 +686,4 @@ if __name__ == "__main__":
 
     # Execute!
     write_summary_file(data_folder, output_folder)
+    # write_summary_file("test_data/three_class")
