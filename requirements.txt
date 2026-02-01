@@ -1,5 +1,5 @@
 docopt==0.6.2
-geopandas==0.13.2
+geopandas==1.1.2
 googlemaps==4.10.0
 psycopg2-binary==2.9.6
 python-dotenv==1.0.0
