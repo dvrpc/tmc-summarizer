@@ -154,79 +154,38 @@ class TMC_File:
                 self.end_date = row.date
                 self.end_time = row.time
 
-        # Set the order of the columns (eb, wb, nb, sb)
-        self.total_cols = [
-            "EB U",
-            "EB Left",
-            "EB Thru",
-            "EB Right",
-            "EB Xwalk Xings",
-            "WB U",
-            "WB Left",
-            "WB Thru",
-            "WB Right",
-            "WB Xwalk Xings",
-            "NB U",
-            "NB Left",
-            "NB Thru",
-            "NB Right",
-            "NB Xwalk Xings",
-            "SB U",
-            "SB Left",
-            "SB Thru",
-            "SB Right",
-            "SB Xwalk Xings",
-            "total_15_min",
-            "total_hourly",
-        ]
-        self.car_cols = [
-            "EB U",
-            "EB Left",
-            "EB Thru",
-            "EB Right",
-            "EB Peds Xwalk",
-            "WB U",
-            "WB Left",
-            "WB Thru",
-            "WB Right",
-            "WB Peds Xwalk",
-            "NB U",
-            "NB Left",
-            "NB Thru",
-            "NB Right",
-            "NB Peds Xwalk",
-            "SB U",
-            "SB Left",
-            "SB Thru",
-            "SB Right",
-            "SB Peds Xwalk",
-            "total_15_min",
-            "total_hourly",
-        ]
-        self.heavy_cols = [
-            "EB U",
-            "EB Left",
-            "EB Thru",
-            "EB Right",
-            "EB Bikes Xwalk",
-            "WB U",
-            "WB Left",
-            "WB Thru",
-            "WB Right",
-            "WB Bikes Xwalk",
-            "NB U",
-            "NB Left",
-            "NB Thru",
-            "NB Right",
-            "NB Bikes Xwalk",
-            "SB U",
-            "SB Left",
-            "SB Thru",
-            "SB Right",
-            "SB Bikes Xwalk",
-            "total_15_min",
-            "total_hourly",
-        ]
+        # Set the order of the columns (eb, wb, nb, sb).
+        # handles both new and old counts that have one or two pedestrian/bike crossing columns per direction
+        header = pd.read_excel(
+            self.filepath, nrows=3, header=None, sheet_name="TOTAL"
+        )
+        level_2 = [str(v).lower() for v in header.iloc[2]]
+        self.has_two_ped_cols = any(
+            f"{d.lower()} crosswalk crossings" in level_2
+            for d in ["EB", "WB", "NB", "SB"]
+        )
+
+        ped_dirs = {
+            "EB": ["NB", "SB"],
+            "WB": ["NB", "SB"],
+            "NB": ["EB", "WB"],
+            "SB": ["EB", "WB"],
+        }
+
+        def build_cols(xwalk_name: str) -> list:
+            cols = []
+            for d in ["EB", "WB", "NB", "SB"]:
+                cols += [f"{d} U", f"{d} Left", f"{d} Thru", f"{d} Right"]
+                if self.has_two_ped_cols:
+                    cols += [f"{d} {xwalk_name} {p}" for p in ped_dirs[d]]
+                else:
+                    cols.append(f"{d} {xwalk_name}")
+            cols += ["total_15_min", "total_hourly"]
+            return cols
+
+        self.total_cols = build_cols("Xwalk Xings")
+        self.car_cols = build_cols("Peds Xwalk")
+        self.heavy_cols = build_cols("Bikes Xwalk")
 
         # Read the DATA tabs into dataframes
         # ----------------------------------
@@ -370,6 +329,16 @@ class TMC_File:
             "peds in croswalk": "Peds Xwalk",
             "crosswalk crossings": "Xwalk Xings",
         }
+
+        # Newer counts have two crossing columns per direction, each
+        # labeled by the direction the pedestrian / bike is traveling
+        # (i.e. 'EB Ped Crossings' within the Southbound group).
+        for d in ["EB", "WB", "NB", "SB"]:
+            replacements_level_2[f"{d.lower()} ped crossings"] = f"Peds Xwalk {d}"
+            replacements_level_2[f"{d.lower()} bicycles in crosswalk"] = (
+                f"Bikes Xwalk {d}"
+            )
+            replacements_level_2[f"{d.lower()} crosswalk crossings"] = f"Xwalk Xings {d}"
 
         df = pd.read_excel(self.filepath, nrows=3, header=None, sheet_name=tabname)
         headers = []
@@ -647,7 +616,7 @@ class TMC_File:
 
             if "Peds" in movement or "Bikes" in movement:
                 wt = movement.split(" ")[0]
-                movement = "Xwalk"
+                movement = " ".join(movement.split(" ")[1:])
 
             treemap_df.at[idx, "wt"] = wt
             treemap_df.at[idx, "leg"] = leg

@@ -103,10 +103,9 @@ def df_network_peak_hour_heavy_pct(
 ):
     cars_copy = df_cars.rename(
         columns={
-            "EB Peds Xwalk": "EB Xwalk Xings",
-            "WB Peds Xwalk": "WB Xwalk Xings",
-            "NB Peds Xwalk": "NB Xwalk Xings",
-            "SB Peds Xwalk": "SB Xwalk Xings",
+            c: c.replace("Peds Xwalk", "Xwalk Xings")
+            for c in df_cars.columns
+            if "Peds Xwalk" in c
         }
     )
     peak_total = get_network_peak_hour_df(df_total, start, end)
@@ -116,7 +115,10 @@ def df_network_peak_hour_heavy_pct(
 
 def network_peak_hour_factor(df_peak: pd.DataFrame):
     """Returns the NETWORK peak hour factor for a given df_peak dataframe"""
-    df_peak["total_15_min_veh"] = df_peak["total_15_min"] - df_peak["EB Xwalk Xings"] - df_peak["NB Xwalk Xings"] - df_peak["SB Xwalk Xings"] - df_peak["WB Xwalk Xings"]
+    xwalk_cols = [c for c in df_peak.columns if "Xwalk Xings" in c]
+    df_peak["total_15_min_veh"] = df_peak["total_15_min"] - df_peak[
+        xwalk_cols
+    ].sum(axis=1)
     fifteen_min_peaks = list(df_peak["total_15_min_veh"])
     hourlymax = sum(fifteen_min_peaks)
     fifteen_min_peak_max = max(fifteen_min_peaks)
@@ -472,9 +474,8 @@ def write_summary_file(
             & (df_detail["dtype"] == "total")
             & (df_detail["location_id"] == key)
         )
-        df_detail.loc[condition, "EB U":"total_15_min"] = tmc_dfs[f"{time}_dict"][
-            key
-        ].values
+        peak_df = tmc_dfs[f"{time}_dict"][key]
+        df_detail.loc[condition, peak_df.columns] = peak_df.values
 
     def update_time_period_heavy_vehicles(key, time: str):
         condition = (
@@ -482,9 +483,8 @@ def write_summary_file(
             & (df_detail["dtype"] == "heavy_pct")
             & (df_detail["location_id"] == key)
         )
-        df_detail.loc[condition, "EB U":"total_15_min"] = heavy_vehicle_dfs[
-            f"{time}_dict"
-        ][key].values
+        peak_df = heavy_vehicle_dfs[f"{time}_dict"][key]
+        df_detail.loc[condition, peak_df.columns] = peak_df.values
 
     def update_peak_hour_factors(key, time: str):
         condition = (
@@ -514,22 +514,16 @@ def write_summary_file(
             & (df_detail["location_id"] == key)
             & (df_detail["dtype"] == "heavy_pct")
         )
-        directions = ["EB", "WB", "NB", "SB"]
-        for direction in directions:
-            df_detail.loc[
-                condition, f"{direction} Bikes Xwalk"
-            ] = heavy_vehicle_for_bikes_dfs[f"{time}_dict"][key][
-                f"{direction} Bikes Xwalk"
-            ][
-                0
-            ]
-            df_detail.loc[condition2, f"{direction} Bikes Xwalk"] = 0
+        heavy_df = heavy_vehicle_for_bikes_dfs[f"{time}_dict"][key]
+        cars_df = car_dfs[f"{time}_dict"][key]
 
-        for direction in directions:
-            df_detail.loc[condition, f"{direction} Peds Xwalk"] = car_dfs[
-                f"{time}_dict"
-            ][key][f"{direction} Peds Xwalk"][0]
-            df_detail.loc[condition2, f"{direction} Peds Xwalk"] = 0
+        for col in [c for c in heavy_df.columns if "Bikes Xwalk" in c]:
+            df_detail.loc[condition, col] = heavy_df[col].iloc[0]
+            df_detail.loc[condition2, col] = 0
+
+        for col in [c for c in cars_df.columns if "Peds Xwalk" in c]:
+            df_detail.loc[condition, col] = cars_df[col].iloc[0]
+            df_detail.loc[condition2, col] = 0
 
     for key in tmc_dfs["am_dict"]:
         update_time_period_totals(key, "am")
@@ -551,13 +545,28 @@ def write_summary_file(
 
     df_detail = df_detail.rename(
         columns={
-            "EB Xwalk Xings": "EB Bikes Xwalk",
-            "WB Xwalk Xings": "WB Bikes Xwalk",
-            "NB Xwalk Xings": "NB Bikes Xwalk",
-            "SB Xwalk Xings": "SB Bikes Xwalk",
+            c: c.replace("Xwalk Xings", "Bikes Xwalk")
+            for c in df_detail.columns
+            if "Xwalk Xings" in c
         },
         errors="raise",
     )
+
+    # Newer counts split ped / bike crossings into two columns per
+    # direction. The crossing direction is perpendicular to the approach.
+    two_ped_cols = any(
+        c.startswith(
+            ("EB Peds Xwalk ", "WB Peds Xwalk ", "NB Peds Xwalk ", "SB Peds Xwalk ")
+        )
+        for c in df_detail.columns
+    )
+    ped_dirs = {
+        "EB": ["NB", "SB"],
+        "WB": ["NB", "SB"],
+        "NB": ["EB", "WB"],
+        "SB": ["EB", "WB"],
+    }
+
     reordered_cols = [
         "location_name",
         "location_id",
@@ -565,32 +574,23 @@ def write_summary_file(
         "period",
         "time",
         "peak_hour_factor",
-        "EB U",
-        "EB Left",
-        "EB Thru",
-        "EB Right",
-        "EB Peds Xwalk",
-        "EB Bikes Xwalk",
-        "WB U",
-        "WB Left",
-        "WB Thru",
-        "WB Right",
-        "WB Peds Xwalk",
-        "WB Bikes Xwalk",
-        "NB U",
-        "NB Left",
-        "NB Thru",
-        "NB Right",
-        "NB Peds Xwalk",
-        "NB Bikes Xwalk",
-        "SB U",
-        "SB Left",
-        "SB Thru",
-        "SB Right",
-        "SB Peds Xwalk",
-        "SB Bikes Xwalk",
-        "total_15_min",
     ]
+    for direction in ["EB", "WB", "NB", "SB"]:
+        reordered_cols += [
+            f"{direction} U",
+            f"{direction} Left",
+            f"{direction} Thru",
+            f"{direction} Right",
+        ]
+        if f"{direction} Peds Xwalk" in df_detail.columns:
+            reordered_cols += [
+                f"{direction} Peds Xwalk",
+                f"{direction} Bikes Xwalk",
+            ]
+        if two_ped_cols:
+            reordered_cols += [f"{direction} Peds Xwalk {p}" for p in ped_dirs[direction]]
+            reordered_cols += [f"{direction} Bikes Xwalk {p}" for p in ped_dirs[direction]]
+    reordered_cols += ["total_15_min"]
     # have to do this after reorder/renames
     for key in tmc_dfs["am_dict"]:
         update_bike_ped_info(key, "am")
@@ -624,6 +624,9 @@ def write_summary_file(
     for tmc in all_tmcs:
         kwargs = {"sheet_name": tmc.location_id, "startrow": 1, "startcol": 0}
 
+        # Width of each block (data columns + the datetime index) plus a gap
+        block_width = tmc.df_total.shape[1] + 2
+
         tmc.df_total.to_excel(writer, **kwargs)
 
         # Add titles to Row 1 as we go...
@@ -631,13 +634,13 @@ def write_summary_file(
         worksheet.write(0, kwargs["startcol"], "TOTAL Vehicles", header_format)
         worksheet.set_column(kwargs["startcol"], kwargs["startcol"], 21)
 
-        kwargs["startcol"] += 24
+        kwargs["startcol"] += block_width
 
         tmc.df_heavy.to_excel(writer, **kwargs)
         worksheet.write(0, kwargs["startcol"], "HEAVY Vehicles", header_format)
         worksheet.set_column(kwargs["startcol"], kwargs["startcol"], 21)
 
-        kwargs["startcol"] += 24
+        kwargs["startcol"] += block_width
 
         tmc.df_pct_heavy.to_excel(writer, **kwargs)
         worksheet.write(0, kwargs["startcol"], "PERCENT HEAVY Vehicles", header_format)
