@@ -1,6 +1,6 @@
 # Project specific
 
-test_data/three_class
+test_data
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
